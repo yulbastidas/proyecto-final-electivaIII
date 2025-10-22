@@ -28,29 +28,53 @@ class _TriagePageState extends State<TriagePage> {
     final p = await supa.from('profiles').select().eq('id', uid).single();
     final cc = (p['country_code'] ?? 'CO') as String;
 
-    final url = Uri.parse('https://<tu-ref>.functions.supabase.co/ai-triage');
+    // ✅ URL correcta (v1)
+    final url = Uri.parse(
+      'https://zanejjvwjarxjryaqbdc.supabase.co/functions/v1/ai-triage',
+    );
+
+    final body = {
+      'petType': petType,
+      'symptoms': symCtrl.text
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList(),
+      'durationH': durationH,
+      'severity': severity,
+      'countryCode': cc,
+      // ✅ modelo que ya funciona en tu cuenta
+      'model': 'llama-3.1-8b-instant',
+    };
+
     final res = await http.post(
       url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'petType': petType,
-        'symptoms': symCtrl.text
-            .split(',')
-            .map((s) => s.trim())
-            .where((s) => s.isNotEmpty)
-            .toList(),
-        'durationH': durationH,
-        'severity': severity,
-        'countryCode': cc,
-      }),
+      headers: {
+        'Content-Type': 'application/json',
+        // Si vuelves a activar "Verify JWT…" en la función, agrega:
+        // 'Authorization': 'Bearer <TU_SUPABASE_ANON_KEY>',
+      },
+      body: jsonEncode(body),
     );
-    final json = jsonDecode(res.body) as Map<String, dynamic>;
+
+    if (!mounted) return;
+
+    if (res.statusCode != 200) {
+      setState(() {
+        advice = 'Error ${res.statusCode}: ${res.body}';
+        loading = false;
+      });
+      return;
+    }
+
+    final Map<String, dynamic> json = jsonDecode(res.body);
     advice = json['advice'] as String?;
 
+    // Guarda el reporte (aunque advice sea null)
     await supa.from('symptom_reports').insert({
       'owner': uid,
       'pet_type': petType,
-      'symptoms': symCtrl.text.split(',').map((s) => s.trim()).toList(),
+      'symptoms': body['symptoms'],
       'duration_h': durationH,
       'severity': severity,
       'ai_advice': advice,
