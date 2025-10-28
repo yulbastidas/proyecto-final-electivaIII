@@ -1,7 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'comments_page.dart';
 
 class FeedPage extends StatefulWidget {
   const FeedPage({super.key});
@@ -11,8 +12,8 @@ class FeedPage extends StatefulWidget {
 
 class _FeedPageState extends State<FeedPage> {
   final supa = Supabase.instance.client;
-  List<dynamic> posts = [];
   bool loading = false;
+  List<Map<String, dynamic>> posts = [];
 
   @override
   void initState() {
@@ -22,23 +23,29 @@ class _FeedPageState extends State<FeedPage> {
 
   Future<String> _userCountry() async {
     final uid = supa.auth.currentUser!.id;
-    final p = await supa.from('profiles').select().eq('id', uid).single();
+    final p = await supa
+        .from('profiles')
+        .select('country_code')
+        .eq('id', uid)
+        .single();
     return (p['country_code'] ?? 'CO') as String;
   }
 
   Future<void> _load() async {
     setState(() => loading = true);
     final cc = await _userCountry();
-    final res = await supa
+    final data = await supa
         .from('posts')
-        .select()
+        .select(
+          'id, author, description, status, media_url, country_code, created_at',
+        )
         .eq('country_code', cc)
         .order('created_at', ascending: false);
-    posts = res;
+    posts = (data as List).cast<Map<String, dynamic>>();
     setState(() => loading = false);
   }
 
-  Future<void> _createPostDialog() async {
+  Future<void> _newPostDialog() async {
     final descCtrl = TextEditingController();
     String status = 'RESCATADO';
     XFile? picked;
@@ -93,7 +100,11 @@ class _FeedPageState extends State<FeedPage> {
           ),
           ElevatedButton(
             onPressed: () async {
-              await _createPost(descCtrl.text.trim(), status, picked);
+              await _createPost(
+                description: descCtrl.text.trim(),
+                status: status,
+                picked: picked,
+              );
               if (!mounted) return;
               Navigator.pop(context);
             },
@@ -104,33 +115,44 @@ class _FeedPageState extends State<FeedPage> {
     );
   }
 
-  Future<void> _createPost(String desc, String status, XFile? file) async {
+  Future<void> _createPost({
+    required String description,
+    required String status,
+    required XFile? picked,
+  }) async {
+    setState(() => loading = true);
+
     String? mediaUrl;
-    if (file != null) {
-      final bytes = await file.readAsBytes();
-      final path = 'p_${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+    if (picked != null) {
+      final bytes = await picked.readAsBytes();
+      final uid = supa.auth.currentUser!.id;
+      final objectPath =
+          '$uid/${DateTime.now().millisecondsSinceEpoch}_${picked.name}';
       await supa.storage
           .from('pets')
           .uploadBinary(
-            path,
+            objectPath,
             bytes,
             fileOptions: const FileOptions(
-              contentType: 'image/jpeg',
               upsert: true,
+              contentType: 'image/jpeg',
             ),
           );
-      mediaUrl = supa.storage.from('pets').getPublicUrl(path);
+      mediaUrl = supa.storage.from('pets').getPublicUrl(objectPath);
     }
+
     final uid = supa.auth.currentUser!.id;
     final cc = await _userCountry();
+
     await supa.from('posts').insert({
       'author': uid,
-      'description': desc,
-      'media_url': mediaUrl,
+      'description': description,
       'status': status,
+      'media_url': mediaUrl,
       'country_code': cc,
     });
-    _load();
+
+    await _load();
   }
 
   @override
@@ -139,20 +161,43 @@ class _FeedPageState extends State<FeedPage> {
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : ListView.builder(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(12),
               itemCount: posts.length,
               itemBuilder: (_, i) {
-                final p = posts[i] as Map<String, dynamic>;
+                final p = posts[i];
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (p['media_url'] != null)
-                        Image.network(p['media_url'], fit: BoxFit.cover),
+                        AspectRatio(
+                          aspectRatio: 16 / 9,
+                          child: Image.network(
+                            p['media_url'],
+                            fit: BoxFit.cover,
+                          ),
+                        ),
                       ListTile(
-                        title: Text(p['status'] ?? ''),
+                        title: Text(p['status']),
                         subtitle: Text(p['description'] ?? ''),
+                      ),
+                      ButtonBar(
+                        children: [
+                          TextButton.icon(
+                            onPressed: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      CommentsPage(postId: p['id'] as String),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.comment),
+                            label: const Text('Comentarios'),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -160,7 +205,7 @@ class _FeedPageState extends State<FeedPage> {
               },
             ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _createPostDialog,
+        onPressed: _newPostDialog,
         child: const Icon(Icons.add),
       ),
     );
