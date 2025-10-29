@@ -3,6 +3,7 @@ import 'feed_page.dart';
 import 'marketplace_page.dart';
 import 'chat_page.dart';
 import 'triage_page.dart';
+import 'map_page.dart'; // <-- NUEVO
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class HomePage extends StatefulWidget {
@@ -13,7 +14,14 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int idx = 0;
-  final pages = const [FeedPage(), MarketplacePage(), ChatPage()];
+
+  // Agregamos MapPage como cuarta pestaña.
+  final pages = const [
+    FeedPage(),
+    MarketplacePage(),
+    ChatPage(),
+    MapPage(), // <-- NUEVO
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -39,10 +47,13 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      body: pages[idx],
+      // Opcional: IndexedStack evita que se recarguen las páginas al cambiar de tab.
+      body: IndexedStack(index: idx, children: pages),
+
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: idx,
         onTap: (i) => setState(() => idx = i),
+        type: BottomNavigationBarType.fixed, // Para mostrar 4 ítems
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.pets), label: 'Feed'),
           BottomNavigationBarItem(
@@ -50,6 +61,10 @@ class _HomePageState extends State<HomePage> {
             label: 'Marketplace',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'Chat'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.map),
+            label: 'Mapa',
+          ), // <-- NUEVO
         ],
       ),
     );
