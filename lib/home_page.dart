@@ -4,7 +4,7 @@ import 'feed_page.dart';
 import 'marketplace_page.dart';
 import 'chat_page.dart';
 import 'map_page.dart';
-import 'triage_page.dart';
+import 'health_log_page.dart.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -26,7 +26,7 @@ class _HomePageState extends State<HomePage> {
             tooltip: 'Asistente síntomas',
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const TriagePage()),
+              MaterialPageRoute(builder: (_) => const HealthLogPage()),
             ),
             icon: const Icon(Icons.health_and_safety),
           ),
