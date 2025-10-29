@@ -1,238 +1,293 @@
+// lib/map_page.dart
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
-
   @override
   State<MapPage> createState() => _MapPageState();
 }
 
 class _MapPageState extends State<MapPage> {
-  LatLng? _currentPosition;
-  final MapController _mapController = MapController();
-  bool _loading = true;
-  String? _errorMsg;
+  final MapController _map = MapController();
 
-  final List<Map<String, dynamic>> _veterinarias = [
-    {
-      'nombre': 'Veterinaria Pet Life',
-      'direccion': 'Cl. 18 #25-40, Pasto, Nariño',
-      'pos': LatLng(1.2086, -77.2772),
-    },
-    {
-      'nombre': 'Clínica Veterinaria Animal Center',
-      'direccion': 'Cra. 26 #15-32, Pasto',
-      'pos': LatLng(1.2098, -77.2811),
-    },
-    {
-      'nombre': 'Veterinaria San Francisco',
-      'direccion': 'Cl. 17 #22-18, Pasto',
-      'pos': LatLng(1.2107, -77.2765),
-    },
-    {
-      'nombre': 'Mi Mascota Veterinaria',
-      'direccion': 'Cra. 27 #14-45, Pasto',
-      'pos': LatLng(1.2135, -77.2849),
-    },
-    {
-      'nombre': 'Clínica Veterinaria Arca de Noé',
-      'direccion': 'Cl. 19 #22-15, Pasto',
-      'pos': LatLng(1.2119, -77.2788),
-    },
+  // Centro inicial: Pasto aprox
+  LatLng? _myPos = const LatLng(-1.2136, -77.2811);
+  bool _loading = false;
+
+  // Veterinarias (ejemplo fijo)
+  final List<_Vet> _vets = const [
+    _Vet('Vet. San Francisco', LatLng(-1.2096, -77.2829)),
+    _Vet('Clínica Vet. La Merced', LatLng(-1.2129, -77.2778)),
+    _Vet('Vet. El Bosque', LatLng(-1.2158, -77.2863)),
+    _Vet('Centro Vet. Sur', LatLng(-1.2215, -77.2784)),
+    _Vet('PetCare Pasto', LatLng(-1.2068, -77.2910)),
   ];
 
-  int _selectedMarkerIndex = -1;
+  // Ruta actual y vet seleccionada
+  List<LatLng> _routePoints = [];
+  _Vet? _selectedVet;
 
   @override
   void initState() {
     super.initState();
-    _getCurrentLocation();
+    _ensureLocation();
   }
 
-  Future<void> _getCurrentLocation() async {
+  Future<void> _ensureLocation() async {
+    setState(() => _loading = true);
     try {
-      setState(() {
-        _loading = true;
-        _errorMsg = null;
-      });
+      final enabled = await Geolocator.isLocationServiceEnabled();
+      if (!enabled) {
+        _showSnack('Activa el GPS para centrar en tu ubicación.');
+      }
 
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        setState(() {
-          _errorMsg = 'Activa la ubicación en tu dispositivo.';
-          _loading = false;
+      LocationPermission perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+
+      if (perm == LocationPermission.deniedForever) {
+        _showSnack('Permisos de ubicación denegados permanentemente.');
+      } else {
+        final pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
+        _myPos = LatLng(pos.latitude, pos.longitude);
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_myPos != null) _map.move(_myPos!, 15);
         });
-        return;
       }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          setState(() {
-            _errorMsg = 'Se necesita permiso de ubicación.';
-            _loading = false;
-          });
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        setState(() {
-          _errorMsg = 'Permiso de ubicación denegado permanentemente.';
-          _loading = false;
-        });
-        return;
-      }
-
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-
-      setState(() {
-        _currentPosition = LatLng(position.latitude, position.longitude);
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMsg = 'Error obteniendo ubicación: $e';
-        _loading = false;
-      });
+    } catch (_) {
+      // usar centro por defecto
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _routeToVet(_Vet vet) async {
+    if (_myPos == null) {
+      _showSnack('No tengo tu ubicación todavía.');
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _selectedVet = vet;
+      _routePoints = [];
+    });
+
+    // OSRM sin API key (a pie). Cambia 'foot' por 'driving' si quieres en carro.
+    final src = '${_myPos!.longitude},${_myPos!.latitude}';
+    final dst = '${vet.pos.longitude},${vet.pos.latitude}';
+    final url =
+        'https://router.project-osrm.org/route/v1/foot/$src;$dst?overview=full&geometries=geojson';
+
+    try {
+      final res = await http.get(Uri.parse(url));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final coords = (data['routes'][0]['geometry']['coordinates'] as List)
+            .cast<List>()
+            .map<LatLng>(
+              (c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()),
+            )
+            .toList();
+
+        setState(() => _routePoints = coords);
+
+        final bounds = LatLngBounds.fromPoints([...coords, _myPos!, vet.pos]);
+        _map.fitCamera(
+          CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(40)),
+        );
+      } else {
+        _showSnack('No se pudo trazar la ruta (OSRM ${res.statusCode}).');
+      }
+    } catch (_) {
+      _showSnack('Error de red al pedir la ruta.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _clearRoute() {
+    setState(() {
+      _routePoints = [];
+      _selectedVet = null;
+    });
+    if (_myPos != null) {
+      _map.move(_myPos!, 15);
+    }
+  }
+
+  void _showSnack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final markers = <Marker>[
+      if (_myPos != null)
+        Marker(
+          point: _myPos!,
+          width: 40,
+          height: 40,
+          child: const Icon(
+            Icons.person_pin_circle,
+            size: 36,
+            color: Colors.blue,
+          ),
+        ),
+      ..._vets.map(
+        (v) => Marker(
+          point: v.pos,
+          width: 48,
+          height: 48,
+          child: GestureDetector(
+            onTap: () => _routeToVet(v),
+            child: Tooltip(
+              message: 'Ir a ${v.name}',
+              child: const Icon(
+                Icons.local_hospital,
+                size: 36,
+                color: Colors.red,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ];
+
     return Scaffold(
-      backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text('Veterinarias cercanas 🐾'),
-        centerTitle: true,
-        backgroundColor: Colors.deepPurpleAccent,
+        actions: [
+          IconButton(
+            tooltip: 'Mi ubicación',
+            onPressed: _ensureLocation,
+            icon: const Icon(Icons.my_location),
+          ),
+          if (_routePoints.isNotEmpty)
+            IconButton(
+              tooltip: 'Limpiar ruta',
+              onPressed: _clearRoute,
+              icon: const Icon(Icons.clear_all),
+            ),
+        ],
       ),
-      body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: Colors.deepPurpleAccent),
-            )
-          : _errorMsg != null
-          ? Center(
-              child: Text(
-                _errorMsg!,
-                style: const TextStyle(color: Colors.red, fontSize: 16),
-                textAlign: TextAlign.center,
+      body: Stack(
+        children: [
+          FlutterMap(
+            mapController: _map,
+            options: MapOptions(
+              initialCenter: _myPos ?? const LatLng(-1.2136, -77.2811),
+              initialZoom: 14,
+              interactionOptions: const InteractionOptions(
+                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
               ),
-            )
-          : _currentPosition == null
-          ? const Center(
-              child: Text(
-                "Ubicación no disponible",
-                style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+            children: [
+              // Capa base OSM
+              TileLayer(
+                urlTemplate:
+                    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                subdomains: const ['a', 'b', 'c'],
+                userAgentPackageName: 'com.example.pets',
               ),
-            )
-          : Stack(
-              children: [
-                FlutterMap(
-                  mapController: _mapController,
-                  options: MapOptions(
-                    initialCenter: _currentPosition!,
-                    initialZoom: 15,
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate:
-                          'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      subdomains: const ['a', 'b', 'c'],
-                    ),
-                    MarkerLayer(
-                      markers: [
-                        // Tu ubicación
-                        Marker(
-                          point: _currentPosition!,
-                          width: 70,
-                          height: 70,
-                          child: const Icon(
-                            Icons.my_location,
-                            color: Colors.blueAccent,
-                            size: 36,
-                          ),
-                        ),
-                        // Veterinarias
-                        for (int i = 0; i < _veterinarias.length; i++)
-                          Marker(
-                            point: _veterinarias[i]['pos'],
-                            width: 80,
-                            height: 80,
-                            child: GestureDetector(
-                              onTap: () =>
-                                  setState(() => _selectedMarkerIndex = i),
-                              child: const Icon(
-                                Icons.local_hospital,
-                                color: Colors.redAccent,
-                                size: 36,
-                              ),
-                            ),
-                          ),
-                      ],
+
+              // Ruta dibujada
+              if (_routePoints.isNotEmpty)
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: _routePoints,
+                      color: theme.colorScheme.primary,
+                      strokeWidth: 4,
                     ),
                   ],
                 ),
 
-                // Popup bonito
-                if (_selectedMarkerIndex != -1)
-                  Align(
-                    alignment: Alignment.topCenter,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Card(
-                        elevation: 6,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                _veterinarias[_selectedMarkerIndex]['nombre'],
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  color: Colors.deepPurpleAccent,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                _veterinarias[_selectedMarkerIndex]['direccion'],
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                              const SizedBox(height: 6),
-                              ElevatedButton.icon(
-                                onPressed: () =>
-                                    setState(() => _selectedMarkerIndex = -1),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.deepPurpleAccent,
-                                ),
-                                icon: const Icon(Icons.close),
-                                label: const Text("Cerrar"),
-                              ),
-                            ],
-                          ),
+              // Marcadores
+              MarkerLayer(markers: markers),
+
+              // 👇 Nuevo: atribución OSM correcta en flutter_map 7.x
+              RichAttributionWidget(
+                attributions: const [
+                  TextSourceAttribution(
+                    '© OpenStreetMap contributors',
+                    // onTap opcional con url_launcher (puedes quitarlo si no usas url_launcher)
+                    // onTap: () => launchUrl(Uri.parse('https://www.openstreetmap.org/copyright')),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          if (_selectedVet != null)
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 18,
+              child: Card(
+                elevation: 6,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+                  child: Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 20,
+                        backgroundColor: Colors.red,
+                        child: Icon(Icons.local_hospital, color: Colors.white),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _selectedVet!.name,
+                          style: theme.textTheme.titleMedium,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: () => _routeToVet(_selectedVet!),
+                        icon: const Icon(Icons.directions_walk),
+                        label: const Text('Ruta'),
+                      ),
+                    ],
                   ),
-              ],
+                ),
+              ),
             ),
+
+          if (_loading)
+            const Align(
+              alignment: Alignment.topCenter,
+              child: LinearProgressIndicator(minHeight: 3),
+            ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _getCurrentLocation,
-        icon: const Icon(Icons.refresh),
-        label: const Text("Actualizar"),
-        backgroundColor: Colors.deepPurpleAccent,
+        onPressed: _ensureLocation,
+        icon: const Icon(Icons.gps_fixed),
+        label: const Text('Actualizar'),
       ),
     );
   }
+}
+
+class _Vet {
+  final String name;
+  final LatLng pos;
+  const _Vet(this.name, this.pos);
 }

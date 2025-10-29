@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthPage extends StatefulWidget {
@@ -10,95 +9,33 @@ class AuthPage extends StatefulWidget {
 
 class _AuthPageState extends State<AuthPage> {
   final supa = Supabase.instance.client;
-
   final emailCtrl = TextEditingController();
   final passCtrl = TextEditingController();
-
-  String countryCode = 'CO';
   bool isLogin = true;
-  String? error;
   bool loading = false;
-
-  // --- Helpers --------------------------------------------------------------
-
-  String _sanitizeEmail(String raw) {
-    String email = raw
-        .toLowerCase()
-        .trim()
-        // elimina espacios normales
-        .replaceAll(RegExp(r'\s+'), '')
-        // NBSP
-        .replaceAll('\u00A0', '')
-        // zero-width chars
-        .replaceAll(RegExp(r'[\u2000-\u200D\u2060\uFEFF]'), '')
-        // cualquier carácter no permitido
-        .replaceAll(RegExp(r'[^a-z0-9@._+\-]'), '');
-    return email;
-  }
-
-  bool _isValidEmail(String email) =>
-      RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
-
-  // --- Submit ---------------------------------------------------------------
+  String? error;
 
   Future<void> _submit() async {
     setState(() {
-      error = null;
       loading = true;
+      error = null;
     });
-
     try {
-      final email = _sanitizeEmail(emailCtrl.text);
+      final email = emailCtrl.text.trim();
       final pass = passCtrl.text.trim();
-
-      // Logs útiles en consola
-      debugPrint(
-        'EMAIL_DEBUG="$email" codeUnits=${email.codeUnits} length=${email.length}',
-      );
-
-      // Validaciones locales rápidas
-      if (!_isValidEmail(email)) {
-        setState(() {
-          error = 'Email inválido';
-          loading = false;
-        });
-        return;
-      }
-      if (pass.length < 6) {
-        setState(() {
-          error = 'La contraseña debe tener al menos 6 caracteres';
-          loading = false;
-        });
-        return;
+      if (email.isEmpty || pass.length < 6) {
+        throw 'Correo y contraseña (mín. 6) son requeridos';
       }
 
       if (isLogin) {
         await supa.auth.signInWithPassword(email: email, password: pass);
       } else {
         final res = await supa.auth.signUp(email: email, password: pass);
-
-        // Si confirm email está ON, user puede venir null hasta confirmar.
-        final uid = res.user?.id ?? supa.auth.currentUser?.id;
-        if (uid == null) {
-          throw const AuthException(
-            'Revisa tu correo para confirmar la cuenta.',
-          );
-        }
-
-        // Crea/actualiza perfil con país
-        await supa.from('profiles').upsert({
-          'id': uid,
-          'display_name': email.split('@').first,
-          'country_code': countryCode,
-        });
+        if (res.user == null) throw 'No se pudo crear el usuario';
       }
 
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/home');
-    } on AuthException catch (e) {
-      // Mensaje exacto de Supabase (user already registered, signups not allowed, etc.)
-      debugPrint('AUTH ERROR: status=${e.statusCode} msg=${e.message}');
-      setState(() => error = e.message);
     } catch (e) {
       setState(() => error = e.toString());
     } finally {
@@ -106,94 +43,99 @@ class _AuthPageState extends State<AuthPage> {
     }
   }
 
-  // --- UI -------------------------------------------------------------------
-
   @override
   Widget build(BuildContext context) {
-    final title = isLogin ? 'Iniciar sesión' : 'Crear cuenta';
-
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: ListView(
-          children: [
-            if (error != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  error!,
-                  style: const TextStyle(color: Colors.red, fontSize: 14),
-                ),
-              ),
-
-            // Email
-            TextField(
-              controller: emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              autofillHints: const [AutofillHints.email],
-              decoration: const InputDecoration(labelText: 'Email'),
-              inputFormatters: [
-                // Opcional: restringe lo que se puede tipear
-                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9@._+\-]')),
-              ],
+      backgroundColor: const Color(0xFFFAFAFF),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Card(
+            elevation: 8,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
             ),
-            const SizedBox(height: 8),
-
-            // Password
-            TextField(
-              controller: passCtrl,
-              decoration: const InputDecoration(labelText: 'Contraseña'),
-              obscureText: true,
-              autofillHints: const [AutofillHints.password],
-            ),
-
-            // País (solo en registro)
-            if (!isLogin) ...[
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: countryCode,
-                items: const [
-                  DropdownMenuItem(value: 'CO', child: Text('Colombia')),
-                  DropdownMenuItem(value: 'AR', child: Text('Argentina')),
-                  DropdownMenuItem(value: 'MX', child: Text('México')),
-                  DropdownMenuItem(value: 'PE', child: Text('Perú')),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 8),
+                  Text(
+                    'PETS',
+                    style: theme.textTheme.headlineMedium!.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    isLogin ? 'Bienvenido de nuevo' : 'Crea tu cuenta',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 22),
+                  if (error != null)
+                    Container(
+                      alignment: Alignment.centerLeft,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(.08),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        error!,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  TextField(
+                    controller: emailCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      prefixIcon: Icon(Icons.alternate_email),
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: passCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Contraseña',
+                      prefixIcon: Icon(Icons.lock_outline),
+                      border: OutlineInputBorder(),
+                    ),
+                    obscureText: true,
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: FilledButton(
+                      onPressed: loading ? null : _submit,
+                      child: Text(
+                        loading
+                            ? 'Procesando...'
+                            : (isLogin ? 'Acceso' : 'Crear cuenta'),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => setState(() => isLogin = !isLogin),
+                    child: Text(
+                      isLogin
+                          ? '¿No tienes cuenta? Regístrate'
+                          : '¿Ya tienes cuenta? Inicia sesión',
+                    ),
+                  ),
                 ],
-                onChanged: (v) => setState(() => countryCode = v ?? 'CO'),
-                decoration: const InputDecoration(labelText: 'País'),
               ),
-            ],
-
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: loading ? null : _submit,
-              child: loading
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(isLogin ? 'Entrar' : 'Registrarme'),
             ),
-            TextButton(
-              onPressed: loading
-                  ? null
-                  : () => setState(() {
-                      isLogin = !isLogin;
-                      error = null;
-                    }),
-              child: Text(isLogin ? 'Crear cuenta' : 'Ya tengo cuenta'),
-            ),
-          ],
+          ),
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    emailCtrl.dispose();
-    passCtrl.dispose();
-    super.dispose();
   }
 }

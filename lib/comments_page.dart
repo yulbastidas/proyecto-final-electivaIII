@@ -1,32 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:timeago/timeago.dart' as timeago;
+
+final _supa = Supabase.instance.client;
 
 class CommentsPage extends StatefulWidget {
   final String postId;
   const CommentsPage({super.key, required this.postId});
-
   @override
   State<CommentsPage> createState() => _CommentsPageState();
 }
 
 class _CommentsPageState extends State<CommentsPage> {
-  final supa = Supabase.instance.client;
   final ctrl = TextEditingController();
 
-  late final Stream<List<Map<String, dynamic>>> stream = supa
-      .from('comments')
-      .stream(primaryKey: ['id'])
-      .eq('post_id', widget.postId)
-      .order('created_at');
-
   Future<void> _send() async {
-    if (ctrl.text.trim().isEmpty) return;
-    await supa.from('comments').insert({
+    final txt = ctrl.text.trim();
+    if (txt.isEmpty) return;
+    await _supa.from('comments').insert({
       'post_id': widget.postId,
-      'author': supa.auth.currentUser!.id,
-      'content': ctrl.text.trim(),
+      'user_id': _supa.auth.currentUser!.id,
+      'text': txt,
     });
     ctrl.clear();
+    setState(() {});
+  }
+
+  Future<void> _delete(String id) async {
+    await _supa.from('comments').delete().eq('id', id);
+    setState(() {});
   }
 
   @override
@@ -36,21 +38,35 @@ class _CommentsPageState extends State<CommentsPage> {
       body: Column(
         children: [
           Expanded(
-            child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: stream,
-              builder: (context, snap) {
-                final items = snap.data ?? [];
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: _supa
+                  .from('comments')
+                  .select()
+                  .eq('post_id', widget.postId)
+                  .order('created_at', ascending: true),
+              builder: (c, s) {
+                if (!s.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final data = s.data!;
+                if (data.isEmpty)
+                  return const Center(child: Text('Sé el primero en comentar'));
+                final me = _supa.auth.currentUser!.id;
                 return ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: items.length,
+                  itemCount: data.length,
                   itemBuilder: (_, i) {
-                    final c = items[i];
+                    final x = data[i];
+                    final t = DateTime.parse(x['created_at'] as String);
                     return ListTile(
-                      title: Text(c['content'] ?? ''),
-                      subtitle: Text(
-                        DateTime.parse(c['created_at']).toLocal().toString(),
-                        style: const TextStyle(fontSize: 12),
-                      ),
+                      leading: const CircleAvatar(child: Icon(Icons.person)),
+                      title: Text(x['text'] as String),
+                      subtitle: Text(timeago.format(t, locale: 'es')),
+                      trailing: x['user_id'] == me
+                          ? IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () => _delete(x['id'] as String),
+                            )
+                          : null,
                     );
                   },
                 );
@@ -59,21 +75,23 @@ class _CommentsPageState extends State<CommentsPage> {
           ),
           SafeArea(
             top: false,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  Expanded(
                     child: TextField(
                       controller: ctrl,
                       decoration: const InputDecoration(
                         hintText: 'Escribe un comentario…',
+                        border: OutlineInputBorder(),
                       ),
                     ),
                   ),
-                ),
-                IconButton(onPressed: _send, icon: const Icon(Icons.send)),
-              ],
+                  const SizedBox(width: 8),
+                  FilledButton(onPressed: _send, child: const Icon(Icons.send)),
+                ],
+              ),
             ),
           ),
         ],

@@ -1,8 +1,9 @@
-import 'dart:typed_data';
+// lib/feed_page.dart
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timeago/timeago.dart' as timeago;
+
+final _supabase = Supabase.instance.client;
 
 class FeedPage extends StatefulWidget {
   const FeedPage({super.key});
@@ -11,347 +12,133 @@ class FeedPage extends StatefulWidget {
 }
 
 class _FeedPageState extends State<FeedPage> {
-  final supa = Supabase.instance.client;
-  bool creating = false;
+  final _descCtrl = TextEditingController();
+  bool _publishing = false;
 
-  Stream<List<Map<String, dynamic>>> _postStream() {
-    // Posts del país del usuario (como tenías)
-    final uid = supa.auth.currentUser!.id;
-    final profileF = supa
-        .from('profiles')
-        .select('country_code')
-        .eq('id', uid)
-        .single();
-    return Stream.fromFuture(profileF).asyncExpand((p) {
-      final cc = (p['country_code'] ?? 'CO') as String;
-      return supa
-          .from('posts')
-          .stream(primaryKey: ['id'])
-          .eq('country_code', cc)
-          .order('created_at', ascending: false)
-          .map((rows) => rows);
-    });
+  Future<List<Post>> _loadPosts() async {
+    final res = await _supabase
+        .from('posts')
+        .select('*')
+        .order('created_at', ascending: false);
+
+    // Mapear con tipos fuertes y defaults seguros
+    return (res as List)
+        .map((m) => Post.fromMap(m as Map<String, dynamic>))
+        .toList();
   }
 
-  Future<void> _toggleLike(int postId) async {
-    final uid = supa.auth.currentUser!.id;
-    final existing = await supa
-        .from('post_likes')
-        .select('id')
-        .eq('post_id', postId)
-        .eq('user_id', uid)
-        .maybeSingle();
-    if (existing != null) {
-      await supa.from('post_likes').delete().eq('id', existing['id']);
-    } else {
-      await supa.from('post_likes').insert({'post_id': postId, 'user_id': uid});
+  Future<void> _publish() async {
+    if (_descCtrl.text.trim().isEmpty) return;
+    setState(() => _publishing = true);
+    try {
+      await _supabase.from('posts').insert({
+        'description': _descCtrl.text.trim(),
+        'status': 'rescatado',
+        'country_code': 'CO',
+        // si manejas media_url, súbela primero a storage y coloca aquí la URL
+      });
+      _descCtrl.clear();
+      if (mounted) setState(() {});
+    } finally {
+      if (mounted) setState(() => _publishing = false);
     }
-  }
-
-  Future<void> _openCreate() async {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => _Composer(onCreated: () => Navigator.pop(context)),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme;
-
-    return Scaffold(
-      body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: _postStream(),
-        builder: (_, snap) {
-          if (!snap.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final posts = snap.data!;
-          if (posts.isEmpty) {
-            return const Center(
-              child: Text('Aún no hay publicaciones en tu zona'),
-            );
-          }
-          return ListView.separated(
-            padding: const EdgeInsets.all(12),
-            itemCount: posts.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (_, i) {
-              final p = posts[i];
-              final created = DateTime.parse(p['created_at']);
-              return Card(
-                clipBehavior: Clip.antiAlias,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 1.5,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    ListTile(
-                      leading: CircleAvatar(
-                        child: Text(
-                          (p['status'] ?? '??').toString().characters.first,
-                        ),
-                      ),
-                      title: Text(
-                        p['status'] ?? '',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      subtitle: Text(timeago.format(created, locale: 'es')),
-                      trailing: Chip(
-                        label: Text(p['country_code'] ?? ''),
-                        side: BorderSide(color: color.outlineVariant),
-                      ),
-                    ),
-                    if (p['media_url'] != null)
-                      AspectRatio(
-                        aspectRatio: 16 / 9,
-                        child: Image.network(p['media_url'], fit: BoxFit.cover),
-                      ),
-                    if ((p['description'] ?? '').toString().isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                        child: Text(p['description']),
-                      ),
-                    FutureBuilder(
-                      future: Future.wait([
-                        supa
-                            .from('post_likes')
-                            .select('id')
-                            .eq('post_id', p['id']),
-                        supa
-                            .from('post_likes')
-                            .select('id')
-                            .eq('post_id', p['id'])
-                            .eq('user_id', supa.auth.currentUser!.id),
-                        supa
-                            .from('comments')
-                            .select('id')
-                            .eq('post_id', p['id']),
-                      ]),
-                      builder: (_, AsyncSnapshot<List<dynamic>> s2) {
-                        final likes = s2.hasData
-                            ? (s2.data![0] as List).length
-                            : 0;
-                        final meLiked = s2.hasData
-                            ? (s2.data![1] as List).isNotEmpty
-                            : false;
-                        final comments = s2.hasData
-                            ? (s2.data![2] as List).length
-                            : 0;
-                        return Row(
-                          children: [
-                            IconButton(
-                              icon: Icon(
-                                meLiked
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                color: meLiked ? Colors.red : null,
-                              ),
-                              onPressed: () => _toggleLike(p['id'] as int),
-                            ),
-                            Text('$likes'),
-                            const SizedBox(width: 16),
-                            IconButton(
-                              icon: const Icon(Icons.mode_comment_outlined),
-                              onPressed: () =>
-                                  _openComments(context, p['id'] as int),
-                            ),
-                            Text('$comments'),
-                            const Spacer(),
-                            TextButton.icon(
-                              onPressed: () => _sharePost(p),
-                              icon: const Icon(Icons.share),
-                              label: const Text('Compartir'),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                ),
+    return RefreshIndicator(
+      onRefresh: () async => setState(() {}),
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _Composer(
+            controller: _descCtrl,
+            loading: _publishing,
+            onSend: _publish,
+          ),
+          const SizedBox(height: 12),
+          FutureBuilder<List<Post>>(
+            future: _loadPosts(),
+            builder: (context, snap) {
+              if (snap.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              }
+              if (snap.hasError) {
+                return Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text('Error: ${snap.error}'),
+                );
+              }
+              final data = snap.data ?? const <Post>[];
+              if (data.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(child: Text('Aún no hay publicaciones')),
+                );
+              }
+              return ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: data.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (context, i) => _PostCard(post: data[i]),
               );
             },
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openCreate,
-        icon: const Icon(Icons.add),
-        label: const Text('Publicar'),
+          ),
+        ],
       ),
     );
   }
-
-  void _openComments(BuildContext ctx, int postId) {
-    Navigator.of(
-      ctx,
-    ).push(MaterialPageRoute(builder: (_) => _CommentsPage(postId: postId)));
-  }
-
-  void _sharePost(Map<String, dynamic> p) {
-    // placeholder; podrías integrar share_plus
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Compartido (demo)')));
-  }
 }
 
-class _Composer extends StatefulWidget {
-  final VoidCallback onCreated;
-  const _Composer({required this.onCreated});
+class _Composer extends StatelessWidget {
+  const _Composer({
+    required this.controller,
+    required this.onSend,
+    required this.loading,
+  });
 
-  @override
-  State<_Composer> createState() => _ComposerState();
-}
-
-class _ComposerState extends State<_Composer> {
-  final supa = Supabase.instance.client;
-  final descCtrl = TextEditingController();
-  String status = 'RESCATADO';
-  XFile? picked;
-  bool saving = false;
-
-  Future<void> _pick() async {
-    final p = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-    );
-    if (p != null) setState(() => picked = p);
-  }
-
-  Future<void> _save() async {
-    setState(() => saving = true);
-    try {
-      String? mediaUrl;
-      if (picked != null) {
-        final bytes = await picked!.readAsBytes();
-        final path =
-            'p_${DateTime.now().millisecondsSinceEpoch}_${picked!.name}';
-        await supa.storage
-            .from('pets')
-            .uploadBinary(
-              path,
-              bytes as Uint8List,
-              fileOptions: const FileOptions(
-                contentType: 'image/jpeg',
-                upsert: true,
-              ),
-            );
-        mediaUrl = supa.storage.from('pets').getPublicUrl(path);
-      }
-      final uid = supa.auth.currentUser!.id;
-      final p = await supa
-          .from('profiles')
-          .select('country_code')
-          .eq('id', uid)
-          .single();
-      final cc = (p['country_code'] ?? 'CO') as String;
-
-      await supa.from('posts').insert({
-        'author': uid,
-        'description': descCtrl.text.trim(),
-        'media_url': mediaUrl,
-        'status': status,
-        'country_code': cc,
-      });
-
-      widget.onCreated();
-    } finally {
-      if (mounted) setState(() => saving = false);
-    }
-  }
+  final TextEditingController controller;
+  final VoidCallback onSend;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          left: 16,
-          right: 16,
-          top: 12,
-        ),
+        padding: const EdgeInsets.all(12),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              height: 5,
-              width: 50,
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                color: Colors.black12,
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            Row(
-              children: [
-                const Text(
-                  'Nueva publicación',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ),
-            DropdownButtonFormField(
-              value: status,
-              items: const [
-                DropdownMenuItem(value: 'RESCATADO', child: Text('Rescatado')),
-                DropdownMenuItem(value: 'ADOPCION', child: Text('En adopción')),
-                DropdownMenuItem(value: 'VENTA', child: Text('En venta')),
-              ],
-              onChanged: (v) => setState(() => status = v as String),
-              decoration: const InputDecoration(labelText: 'Estado'),
-            ),
             TextField(
-              controller: descCtrl,
+              controller: controller,
               maxLines: 3,
               decoration: const InputDecoration(
-                labelText: '¿Qué pasa con la mascota?',
+                hintText: '¿Qué publicas hoy?',
+                border: InputBorder.none,
               ),
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                ElevatedButton.icon(
-                  onPressed: _pick,
-                  icon: const Icon(Icons.photo),
-                  label: const Text('Agregar foto'),
-                ),
-                const SizedBox(width: 12),
-                if (picked != null)
-                  Text(picked!.name, overflow: TextOverflow.ellipsis),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
+            Align(
+              alignment: Alignment.centerRight,
               child: FilledButton.icon(
-                onPressed: saving ? null : _save,
-                icon: saving
+                onPressed: loading ? null : onSend,
+                icon: loading
                     ? const SizedBox(
-                        width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
+                        width: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.send),
                 label: const Text('Publicar'),
               ),
             ),
-            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -359,78 +146,136 @@ class _ComposerState extends State<_Composer> {
   }
 }
 
-class _CommentsPage extends StatefulWidget {
-  final int postId;
-  const _CommentsPage({required this.postId});
-  @override
-  State<_CommentsPage> createState() => _CommentsPageState();
-}
-
-class _CommentsPageState extends State<_CommentsPage> {
-  final supa = Supabase.instance.client;
-  final ctrl = TextEditingController();
-
-  Stream<List<Map<String, dynamic>>> get stream => supa
-      .from('comments')
-      .stream(primaryKey: ['id'])
-      .eq('post_id', widget.postId)
-      .order('created_at');
-
-  Future<void> _send() async {
-    if (ctrl.text.trim().isEmpty) return;
-    await supa.from('comments').insert({
-      'post_id': widget.postId,
-      'author': supa.auth.currentUser!.id,
-      'body': ctrl.text.trim(),
-    });
-    ctrl.clear();
-  }
+class _PostCard extends StatelessWidget {
+  const _PostCard({required this.post});
+  final Post post;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Comentarios')),
-      body: Column(
+    final created = timeago.format(post.createdAt, locale: 'es');
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: StreamBuilder(
-              stream: stream,
-              builder: (_, snap) {
-                final rows = snap.data ?? [];
-                return ListView.builder(
-                  padding: const EdgeInsets.all(8),
-                  itemCount: rows.length,
-                  itemBuilder: (_, i) {
-                    final c = rows[i];
-                    final created = DateTime.parse(c['created_at']);
-                    return ListTile(
-                      leading: const CircleAvatar(child: Icon(Icons.person)),
-                      title: Text(c['body']),
-                      subtitle: Text(timeago.format(created, locale: 'es')),
-                    );
-                  },
-                );
-              },
+          // Header
+          ListTile(
+            leading: CircleAvatar(
+              child: Text(
+                (post.countryCode?.toUpperCase() ?? 'CO').substring(0, 1),
+              ),
             ),
+            title: Text((post.status ?? 'Publicación').toUpperCase()),
+            subtitle: Text(created),
+            trailing: Text(post.countryCode?.toUpperCase() ?? 'CO'),
           ),
-          SafeArea(
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: ctrl,
-                    decoration: const InputDecoration(
-                      hintText: 'Escribe un comentario',
-                      contentPadding: EdgeInsets.all(12),
-                    ),
+
+          // Imagen (opcional)
+          if ((post.mediaUrl ?? '').isNotEmpty)
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Image.network(
+                post.mediaUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Icon(Icons.image_not_supported),
                   ),
                 ),
-                IconButton(onPressed: _send, icon: const Icon(Icons.send)),
+              ),
+            ),
+
+          // Descripción
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Text(post.description ?? ''),
+          ),
+
+          // Footer con contadores — ¡AQUÍ ESTABA EL CRASH!
+          // Usa toString() para convertir ints a String antes de pasarlos a Text
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: Row(
+              children: [
+                _IconText(
+                  icon: Icons.favorite_border,
+                  text: post.likes.toString(),
+                ),
+                const SizedBox(width: 16),
+                _IconText(
+                  icon: Icons.mode_comment_outlined,
+                  text: post.comments.toString(),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: () {}, // compartir
+                  icon: const Icon(Icons.share),
+                  label: const Text('Compartir'),
+                ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _IconText extends StatelessWidget {
+  const _IconText({required this.icon, required this.text});
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18),
+        const SizedBox(width: 6),
+        Text(text), // <-- Text ahora siempre recibe String
+      ],
+    );
+  }
+}
+
+/// Modelo tipado (evita errores de tipos al convertir desde Supabase)
+class Post {
+  final int id;
+  final String author;
+  final String? description;
+  final String? mediaUrl;
+  final String? status;
+  final String? countryCode;
+  final DateTime createdAt;
+  final int likes;
+  final int comments;
+
+  Post({
+    required this.id,
+    required this.author,
+    required this.createdAt,
+    this.description,
+    this.mediaUrl,
+    this.status,
+    this.countryCode,
+    this.likes = 0,
+    this.comments = 0,
+  });
+
+  factory Post.fromMap(Map<String, dynamic> m) {
+    return Post(
+      id: (m['id'] as num).toInt(),
+      author: (m['author'] as String),
+      description: m['description'] as String?,
+      mediaUrl: m['media_url'] as String?,
+      status: m['status'] as String?,
+      countryCode: m['country_code'] as String?,
+      createdAt: DateTime.parse(m['created_at'] as String),
+      likes: (m['likes'] is num) ? (m['likes'] as num).toInt() : 0,
+      comments: (m['comments'] is num) ? (m['comments'] as num).toInt() : 0,
     );
   }
 }
