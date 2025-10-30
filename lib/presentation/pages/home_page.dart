@@ -1,55 +1,55 @@
+// lib/presentation/pages/home_page.dart
 import 'package:flutter/material.dart';
-import '../../core/constants/app_colors.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'feed_page.dart';
+import 'marketplace_page.dart';
 import 'chat_page.dart';
 import 'map_page.dart';
-import 'health_log_page.dart';
-import 'marketplace_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  int index = 0;
-  final pages = const [
-    FeedPage(),
-    Placeholder(), // Marketplace (puedes activarlo luego)
-    ChatPage(),
-    MapPage(),
-    HealthLogPage(),
-  ];
+  int idx = 0;
+
+  // Asegúrate de que estas páginas existen en:
+  // lib/presentation/pages/feed_page.dart
+  // lib/presentation/pages/marketplace_page.dart
+  // lib/presentation/pages/chat_page.dart
+  // lib/presentation/pages/map_page.dart
+  final pages = const [FeedPage(), MarketplacePage(), ChatPage(), MapPage()];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bg,
       appBar: AppBar(
-        title: const Text('Mascotas'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        title: const Text('Pets'),
+        actions: [
+          IconButton(
+            tooltip: 'Sign out',
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await Supabase.instance.client.auth.signOut();
+              if (!mounted) return;
+              Navigator.of(context).pushNamedAndRemoveUntil('/', (r) => false);
+            },
+          ),
+        ],
       ),
-      body: pages[index],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: index,
-        onDestinationSelected: (i) => setState(() => index = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.pets_outlined), label: 'Feed'),
-          NavigationDestination(
-            icon: Icon(Icons.store_outlined),
-            label: 'Marketplace',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            label: 'Chat',
-          ),
-          NavigationDestination(icon: Icon(Icons.map_outlined), label: 'Mapa'),
-          NavigationDestination(
-            icon: Icon(Icons.medical_services_outlined),
-            label: 'Salud',
-          ),
+      body: pages[idx],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: idx,
+        onTap: (i) => setState(() => idx = i),
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.pets), label: 'Feed'),
+          BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Market'),
+          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble), label: 'Chat'),
+          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
         ],
       ),
     );
