@@ -1,6 +1,7 @@
-// lib/chat_page.dart
 import 'package:flutter/material.dart';
-import 'services/ai_service.dart';
+import '../../data/repositories/chat_repository_impl.dart';
+import '../../data/services/ai_service.dart';
+import '../../domain/entities/message_entity.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -10,143 +11,104 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
-  final _ctrl = TextEditingController();
-  final _scroll = ScrollController();
-  final _msgs = <_Msg>[];
-  bool _loading = false;
+  final repo = ChatRepositoryImpl();
+  final ai = AiService();
+  final input = TextEditingController();
+  final scroll = ScrollController();
+  bool loading = false;
+  List<MessageEntity> msgs = [];
+
+  Future<void> _load() async {
+    msgs = await repo.history();
+    setState(() {});
+  }
 
   @override
-  void dispose() {
-    _ctrl.dispose();
-    _scroll.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _load();
   }
 
   Future<void> _send() async {
-    final txt = _ctrl.text.trim();
-    if (txt.isEmpty || _loading) return;
+    final t = input.text.trim();
+    if (t.isEmpty) return;
+    setState(() => loading = true);
+    final user = await repo.sendUser(t);
+    setState(() => msgs.add(user));
+    input.clear();
 
-    setState(() {
-      _ctrl.clear();
-      _msgs.add(_Msg(role: 'user', text: txt, time: DateTime.now()));
-      _loading = true;
-    });
-
-    final reply = await AiService.instance.ask(txt);
-
-    setState(() {
-      _msgs.add(_Msg(role: 'assistant', text: reply, time: DateTime.now()));
-      _loading = false;
-    });
-
-    await Future.delayed(const Duration(milliseconds: 100));
-    _scroll.animateTo(
-      _scroll.position.maxScrollExtent + 120,
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOut,
-    );
+    try {
+      final answer = await ai.ask(t);
+      final asst = await repo.sendAssistant(answer);
+      setState(() => msgs.add(asst));
+      await Future.delayed(const Duration(milliseconds: 100));
+      scroll.jumpTo(scroll.position.maxScrollExtent);
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      setState(() => loading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Chat IA veterinaria')),
-      body: Column(
-        children: [
-          const SizedBox(height: 8),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Orientación general. No reemplaza a un veterinario.',
-                style: TextStyle(color: Colors.black54),
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.builder(
+            controller: scroll,
+            padding: const EdgeInsets.all(12),
+            itemCount: msgs.length,
+            itemBuilder: (_, i) {
+              final m = msgs[i];
+              final me = m.role == 'user';
+              return Align(
+                alignment: me ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: me
+                        ? Colors.deepPurple.shade100
+                        : Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(m.text),
+                ),
+              );
+            },
+          ),
+        ),
+        SafeArea(
+          child: Row(
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: TextField(
+                    controller: input,
+                    decoration: const InputDecoration(
+                      hintText: 'Describe el síntoma...',
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: ListView.builder(
-              controller: _scroll,
-              padding: const EdgeInsets.all(12),
-              itemCount: _msgs.length,
-              itemBuilder: (_, i) {
-                final m = _msgs[i];
-                final isUser = m.role == 'user';
-                return Align(
-                  alignment: isUser
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 6),
-                    padding: const EdgeInsets.all(12),
-                    constraints: const BoxConstraints(maxWidth: 520),
-                    decoration: BoxDecoration(
-                      color: isUser
-                          ? Colors.purple.shade100
-                          : Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Text(m.text),
-                  ),
-                );
-              },
-            ),
-          ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _ctrl,
-                      minLines: 1,
-                      maxLines: 4,
-                      decoration: InputDecoration(
-                        hintText: 'Describe el síntoma...',
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(
-                    onPressed: _loading ? null : _send,
-                    icon: _loading
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.send),
-                    label: const Text(''),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.all(14),
-                    ),
-                  ),
-                ],
+              IconButton(
+                onPressed: loading ? null : _send,
+                icon: loading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
-}
-
-class _Msg {
-  final String role;
-  final String text;
-  final DateTime time;
-  _Msg({required this.role, required this.text, required this.time});
 }

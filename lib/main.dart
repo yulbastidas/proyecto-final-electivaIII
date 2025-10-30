@@ -1,26 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'auth_page.dart';
-import 'home_page.dart';
+import 'core/config/supabase_config.dart';
+import 'presentation/pages/auth_page.dart';
+import 'presentation/pages/home_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // 1) Cargar variables del .env
-  await dotenv.load(fileName: ".env");
-
-  // 2) Inicializar Supabase con variables de entorno
-  final url = dotenv.env['SUPABASE_URL'];
-  final anonKey = dotenv.env['SUPABASE_ANON_KEY'];
-
-  if (url == null || url.isEmpty || anonKey == null || anonKey.isEmpty) {
-    // Falla temprana para evitar errores silenciosos
-    throw Exception('Faltan SUPABASE_URL o SUPABASE_ANON_KEY en .env');
-  }
-
-  await Supabase.initialize(url: url, anonKey: anonKey);
-
+  await dotenv.load(fileName: '.env');
+  await SupabaseConfig.init();
   runApp(const App());
 }
 
@@ -29,17 +16,16 @@ class App extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final session = Supabase.instance.client.auth.currentSession;
-
+    final session = SupabaseConfig.client.auth.currentSession;
     return MaterialApp(
       title: 'Mascotas',
       debugShowCheckedModeBanner: false,
+      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.deepPurple),
       routes: {
         '/': (_) => session == null ? const AuthPage() : const HomePage(),
         '/home': (_) => const HomePage(),
       },
       initialRoute: '/',
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.purple),
     );
   }
 }
