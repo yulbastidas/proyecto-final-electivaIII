@@ -1,11 +1,11 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../data/models/listing.dart';
-import '../../data/services/listings_service.dart';
-import '../widgets/listing_card.dart';
-import '../widgets/primary_button.dart';
-import '../widgets/app_text_field.dart';
+import 'package:pets/data/models/listing.dart';
+import 'package:pets/data/services/listings_service.dart';
+import 'package:pets/widgets/listing_card.dart';
+import 'package:pets/widgets/app_text_field.dart';
+import 'package:pets/widgets/primary_button.dart';
 
 class MarketplacePage extends StatefulWidget {
   const MarketplacePage({super.key});
@@ -14,137 +14,203 @@ class MarketplacePage extends StatefulWidget {
 }
 
 class _MarketplacePageState extends State<MarketplacePage> {
-  final _service = ListingsService();
-  late Future<List<Listing>> _future;
+  final _svc = ListingsService();
+
+  bool _loading = true;
+  List<Listing> _items = [];
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      _items = await _svc.getAll();
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _create({
+    required String title,
+    required String description,
+    required double price,
+    required String status,
+    Uint8List? imageBytes,
+    String? filename,
+  }) async {
+    String? url;
+    if (imageBytes != null && filename != null) {
+      url = await _svc.uploadImageBytes(bytes: imageBytes, filename: filename);
+    }
+    await _svc.create(
+      title: title,
+      description: description,
+      price: price,
+      status: status,
+      imageUrl: url,
+    );
+    await _load();
+  }
 
   @override
   void initState() {
     super.initState();
-    _future = _service.fetchListings();
-  }
-
-  Future<void> _refresh() async {
-    setState(() => _future = _service.fetchListings());
-  }
-
-  Future<void> _openCreate() async {
-    final title = TextEditingController();
-    final desc = TextEditingController();
-    final price = TextEditingController();
-    final contact = TextEditingController();
-    File? image;
-
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          top: 12,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Nuevo artículo',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              const SizedBox(height: 12),
-              AppTextField(controller: title, hint: 'Título'),
-              const SizedBox(height: 10),
-              AppTextField(controller: desc, hint: 'Descripción', maxLines: 3),
-              const SizedBox(height: 10),
-              AppTextField(
-                controller: price,
-                hint: 'Precio (ej: 120000)',
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 10),
-              AppTextField(
-                controller: contact,
-                hint: 'Contacto (WhatsApp / Email / Teléfono)',
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      final x = await ImagePicker().pickImage(
-                        source: ImageSource.gallery,
-                        imageQuality: 85,
-                      );
-                      if (x != null) image = File(x.path);
-                    },
-                    icon: const Icon(Icons.photo),
-                    label: const Text('Imagen'),
-                  ),
-                  const Spacer(),
-                  PrimaryButton(
-                    label: 'Publicar',
-                    icon: Icons.cloud_upload_outlined,
-                    onPressed: () async {
-                      Navigator.pop(context);
-                      final p = double.tryParse(price.text.trim()) ?? 0;
-                      await _service.createListing(
-                        title: title.text.trim(),
-                        description: desc.text.trim(),
-                        price: p,
-                        contact: contact.text.trim(),
-                        imageFile: image,
-                      );
-                      if (context.mounted) _refresh();
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    _load();
   }
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: _refresh,
-      child: FutureBuilder(
-        future: _future,
-        builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
-          final items = snap.data as List<Listing>? ?? [];
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: items.length + 1,
-            itemBuilder: (context, i) {
-              if (i == 0) {
-                return Align(
-                  alignment: Alignment.centerRight,
-                  child: PrimaryButton(
-                    label: 'Vender',
-                    icon: Icons.add,
-                    onPressed: _openCreate,
+    return Scaffold(
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.all(12),
+                children: [
+                  _Composer(onCreate: _create),
+                  const SizedBox(height: 12),
+                  for (final it in _items)
+                    ListingCard(
+                      listing: it,
+                      onDelete: () => _svc.delete(it.id).then((_) => _load()),
+                    ),
+                ],
+              ),
+            ),
+    );
+  }
+}
+
+/// Formulario para crear una publicación de marketplace
+class _Composer extends StatefulWidget {
+  final Future<void> Function({
+    required String title,
+    required String description,
+    required double price,
+    required String status,
+    Uint8List? imageBytes,
+    String? filename,
+  })
+  onCreate;
+
+  const _Composer({required this.onCreate});
+
+  @override
+  State<_Composer> createState() => _ComposerState();
+}
+
+class _ComposerState extends State<_Composer> {
+  final _title = TextEditingController();
+  final _desc = TextEditingController();
+  final _price = TextEditingController();
+  String _status = 'sale';
+  Uint8List? _bytes;
+  String? _filename;
+  bool _submitting = false;
+
+  Future<void> _pick() async {
+    final x = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+    if (x == null) return;
+    final b = await x.readAsBytes();
+    setState(() {
+      _bytes = b;
+      _filename = x.name;
+    });
+  }
+
+  Future<void> _submit() async {
+    final p = double.tryParse(_price.text.trim()) ?? 0;
+    if (_title.text.trim().isEmpty || _desc.text.trim().isEmpty) return;
+
+    setState(() => _submitting = true);
+    try {
+      await widget.onCreate(
+        title: _title.text.trim(),
+        description: _desc.text.trim(),
+        price: p,
+        status: _status,
+        imageBytes: _bytes,
+        filename: _filename,
+      );
+      _title.clear();
+      _desc.clear();
+      _price.clear();
+      setState(() {
+        _status = 'sale';
+        _bytes = null;
+        _filename = null;
+      });
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(.4),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: AppTextField(controller: _title, label: 'Título'),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: AppTextField(
+                    controller: _price,
+                    label: 'Precio',
+                    keyboardType: TextInputType.number,
                   ),
-                );
-              }
-              final it = items[i - 1];
-              return ListingCard(
-                item: it,
-                onDelete: () async {
-                  await _service.deleteOwnListing(it.id);
-                  _refresh();
-                },
-              );
-            },
-          );
-        },
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            AppTextField(controller: _desc, label: 'Descripción', maxLines: 3),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                DropdownButton<String>(
+                  value: _status,
+                  items: const [
+                    DropdownMenuItem(value: 'sale', child: Text('Venta')),
+                    DropdownMenuItem(
+                      value: 'adoption',
+                      child: Text('Adopción'),
+                    ),
+                    DropdownMenuItem(value: 'rescue', child: Text('Rescate')),
+                  ],
+                  onChanged: (v) => setState(() => _status = v ?? 'sale'),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: _pick,
+                  icon: const Icon(Icons.photo),
+                  label: Text(_filename ?? 'Imagen (opcional)'),
+                ),
+                const Spacer(),
+                PrimaryButton(
+                  text: 'Publicar',
+                  loading: _submitting,
+                  onPressed: _submit,
+                ),
+              ],
+            ),
+            if (_bytes != null) ...[
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.memory(_bytes!, height: 140, fit: BoxFit.cover),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

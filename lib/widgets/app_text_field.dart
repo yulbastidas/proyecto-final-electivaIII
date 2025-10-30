@@ -2,27 +2,28 @@ import 'package:flutter/material.dart';
 
 class AppTextField extends StatelessWidget {
   final TextEditingController controller;
-  final String hint;
+  final String label;
   final int maxLines;
   final TextInputType? keyboardType;
+
   const AppTextField({
     super.key,
     required this.controller,
-    required this.hint,
+    required this.label,
     this.maxLines = 1,
     this.keyboardType,
   });
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return TextFormField(
       controller: controller,
-      maxLines: maxLines,
       keyboardType: keyboardType,
+      maxLines: maxLines,
       decoration: InputDecoration(
-        hintText: hint,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.all(12),
+        labelText: label,
+        border: const OutlineInputBorder(),
+        isDense: true,
       ),
     );
   }

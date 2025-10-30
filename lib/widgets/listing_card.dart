@@ -2,64 +2,68 @@ import 'package:flutter/material.dart';
 import '../../data/models/listing.dart';
 
 class ListingCard extends StatelessWidget {
-  final Listing item;
+  final Listing listing;
   final VoidCallback? onDelete;
-  const ListingCard({super.key, required this.item, this.onDelete});
+
+  const ListingCard({super.key, required this.listing, this.onDelete});
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      margin: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (item.imageUrl != null)
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(16),
-              ),
+          if (listing.imageUrl != null)
+            AspectRatio(
+              aspectRatio: 16 / 9,
               child: Image.network(
-                item.imageUrl!,
-                height: 190,
-                width: double.infinity,
+                listing.imageUrl!,
                 fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    const Center(child: Icon(Icons.image_not_supported)),
               ),
             ),
-          ListTile(
-            title: Text(
-              item.title,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            subtitle: Text(
-              item.description,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing: onDelete != null
-                ? IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: onDelete,
-                  )
-                : null,
-          ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Row(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '\$${item.price.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  listing.title,
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-                const Spacer(),
+                const SizedBox(height: 4),
+                Text(
+                  listing.description,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 12,
+                  children: [
+                    Chip(label: Text('Status: ${listing.status}')),
+                    Chip(
+                      label: Text(
+                        'Price: \$${listing.price.toStringAsFixed(2)}',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(Icons.call, size: 18),
-                    const SizedBox(width: 6),
-                    Text(item.contact),
+                    Text(
+                      'Publicado: ${listing.createdAt}',
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                    const Spacer(),
+                    if (onDelete != null)
+                      IconButton(
+                        tooltip: 'Eliminar',
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: onDelete,
+                      ),
                   ],
                 ),
               ],

@@ -1,13 +1,14 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'core/config/supabase_config.dart';
 import 'presentation/pages/auth_page.dart';
 import 'presentation/pages/home_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: '.env');
-  await SupabaseConfig.init();
+  await SupabaseConfig.init(); // <- aquí estaba el error (ahora sí existe)
   runApp(const App());
 }
 
@@ -16,16 +17,16 @@ class App extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final session = SupabaseConfig.client.auth.currentSession;
+    final session = Supabase.instance.client.auth.currentSession;
     return MaterialApp(
-      title: 'Mascotas',
+      title: 'Pets',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.deepPurple),
       routes: {
         '/': (_) => session == null ? const AuthPage() : const HomePage(),
         '/home': (_) => const HomePage(),
       },
       initialRoute: '/',
+      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.purple),
     );
   }
 }

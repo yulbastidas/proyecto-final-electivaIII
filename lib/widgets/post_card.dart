@@ -1,60 +1,98 @@
 import 'package:flutter/material.dart';
-import '../../widgets/post.dart';
-import '../../core/constants/app_colors.dart';
+import '../../data/models/post_model.dart';
 
 class PostCard extends StatelessWidget {
   final Post post;
+  final VoidCallback? onLike;
+  final VoidCallback? onComment;
   final VoidCallback? onDelete;
-  const PostCard({super.key, required this.post, this.onDelete});
+
+  const PostCard({
+    super.key,
+    required this.post,
+    this.onLike,
+    this.onComment,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final badge = switch (post.status) {
-      'sale' => ('VENTA', Colors.orange),
-      'rescue' => ('RESCATE', Colors.redAccent),
-      _ => ('ADOPCIÓN', AppColors.primary),
+    final statusColor = switch (post.status) {
+      'RESCATADO' => Colors.green,
+      'ADOPCION' => Colors.orange,
+      'VENTA' => Colors.blue,
+      _ => Colors.grey,
     };
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (post.mediaUrl != null)
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Image.network(post.mediaUrl!, fit: BoxFit.cover),
+            ),
           ListTile(
-            leading: CircleAvatar(child: Text(post.countryCode)),
-            title: Text(
-              badge.$1,
-              style: TextStyle(
-                color: badge.$2,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
-              ),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(.1),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: statusColor.withOpacity(.4)),
+                  ),
+                  child: Text(
+                    post.status,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '@${post.author.substring(0, post.author.length > 6 ? 6 : post.author.length)}…',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
             ),
-            subtitle: Text(
-              post.description,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(post.description),
             ),
-            trailing: onDelete != null
-                ? IconButton(
+            trailing: onDelete == null
+                ? null
+                : IconButton(
                     icon: const Icon(Icons.delete_outline),
                     onPressed: onDelete,
-                  )
-                : null,
+                  ),
           ),
-          if (post.mediaUrl != null)
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                bottom: Radius.circular(16),
-              ),
-              child: Image.network(
-                post.mediaUrl!,
-                fit: BoxFit.cover,
-                height: 200,
-                width: double.infinity,
-              ),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.favorite_border),
+                  onPressed: onLike,
+                ),
+                Text('${post.likes}'),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: onComment,
+                  icon: const Icon(Icons.comment_outlined),
+                  label: const Text('Comentarios'),
+                ),
+              ],
             ),
+          ),
         ],
       ),
     );

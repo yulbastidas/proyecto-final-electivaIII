@@ -1,29 +1,28 @@
 import 'package:flutter/material.dart';
-import '../../core/constants/app_colors.dart';
 
 class PrimaryButton extends StatelessWidget {
-  final String label;
+  final String text;
   final VoidCallback? onPressed;
-  final IconData? icon;
+  final bool loading;
+
   const PrimaryButton({
     super.key,
-    required this.label,
+    required this.text,
     this.onPressed,
-    this.icon,
+    this.loading = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return FilledButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon ?? Icons.pets_rounded),
-      label: Text(label),
-      style: FilledButton.styleFrom(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      ),
+    return FilledButton(
+      onPressed: loading ? null : onPressed,
+      child: loading
+          ? const SizedBox(
+              height: 18,
+              width: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Text(text),
     );
   }
 }
