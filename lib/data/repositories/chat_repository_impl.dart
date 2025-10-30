@@ -1,4 +1,3 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/config/supabase_config.dart';
 import '../../domain/entities/message_entity.dart';
 import '../../domain/repositories/chat_repository.dart';

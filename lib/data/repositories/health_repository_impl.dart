@@ -1,4 +1,3 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/config/supabase_config.dart';
 import '../../domain/entities/health_event_entity.dart';
 import '../../domain/entities/weight_entity.dart';
