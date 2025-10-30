@@ -1,77 +1,60 @@
-import 'dart:io';
+// lib/presentation/controller/feed_controller.dart
 import 'package:flutter/foundation.dart';
-import '../../data/repositories/feed_repository_impl.dart';
-import '../../domain/entities/post_entity.dart';
-import '../../domain/entities/comment_entity.dart';
+import 'package:pets/domain/entities/post.dart';
+import 'package:pets/data/services/posts_service.dart';
 
 class FeedController extends ChangeNotifier {
-  final _repo = FeedRepositoryImpl();
+  final PostsService service;
+  FeedController(this.service);
 
+  final List<Post> items = [];
   bool loading = false;
-  List<PostEntity> posts = [];
+  String? filterStatus; // 'rescued' | 'adoption' | 'sale'
 
-  Future<void> loadPosts() async {
+  Future<void> load({bool refresh = false}) async {
+    if (loading) return;
     loading = true;
+    if (refresh) items.clear();
     notifyListeners();
-    try {
-      posts = await _repo.listPosts();
-    } finally {
-      loading = false;
-      notifyListeners();
-    }
+
+    final data = await service.fetchFeed(
+      status: filterStatus,
+      limit: 30,
+      offset: items.length,
+    );
+    items.addAll(data);
+    loading = false;
+    notifyListeners();
   }
 
-  /// Sube la imagen (opcional) y crea el post.
-  Future<void> publish({
-    required String description,
+  Future<void> create({
+    required String content,
     required String status,
-    File? imageFile,
+    List<int>? imageBytes,
+    String? filename,
   }) async {
-    loading = true;
-    notifyListeners();
-    try {
-      String? url;
-      if (imageFile != null) {
-        url = await _repo.upload(imageFile);
-      }
-      await _repo.createPost(
-        description: description,
-        status: status,
-        mediaUrl: url,
-      );
-      await loadPosts();
-    } finally {
-      loading = false;
-      notifyListeners();
-    }
-  }
-}
-
-class CommentsController extends ChangeNotifier {
-  final _repo = FeedRepositoryImpl();
-  bool sending = false;
-  List<CommentEntity> comments = [];
-
-  Future<void> load(int postId) async {
-    comments = await _repo.listComments(postId);
+    final post = await service.publish(
+      content: content,
+      status: status,
+      imageBytes: imageBytes,
+      filename: filename,
+    );
+    items.insert(0, post);
     notifyListeners();
   }
 
-  Future<void> send(int postId, String text) async {
-    if (text.trim().isEmpty) return;
-    sending = true;
-    notifyListeners();
-    try {
-      await _repo.addComment(postId: postId, text: text.trim());
-      await load(postId);
-    } finally {
-      sending = false;
+  Future<void> toggleLike(String postId) async {
+    final updated = await service.likeToggle(postId);
+    final idx = items.indexWhere((e) => e.id == postId);
+    if (idx != -1) {
+      items[idx] = updated;
       notifyListeners();
     }
   }
 
-  Future<void> delete(int postId, int commentId) async {
-    await _repo.deleteOwnComment(commentId);
-    await load(postId);
+  Future<void> delete(String postId) async {
+    await service.remove(postId);
+    items.removeWhere((e) => e.id == postId);
+    notifyListeners();
   }
 }

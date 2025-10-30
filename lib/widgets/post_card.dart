@@ -1,96 +1,63 @@
+// lib/widgets/post_card.dart
 import 'package:flutter/material.dart';
-import '../../data/models/post_model.dart';
+import 'package:pets/domain/entities/post.dart';
 
 class PostCard extends StatelessWidget {
   final Post post;
   final VoidCallback? onLike;
-  final VoidCallback? onComment;
   final VoidCallback? onDelete;
+  final VoidCallback? onComment; // <- nuevo
 
   const PostCard({
     super.key,
     required this.post,
     this.onLike,
-    this.onComment,
     this.onDelete,
+    this.onComment, // <- nuevo
   });
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = switch (post.status) {
-      'RESCATADO' => Colors.green,
-      'ADOPCION' => Colors.orange,
-      'VENTA' => Colors.blue,
-      _ => Colors.grey,
-    };
+    final theme = Theme.of(context);
 
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      clipBehavior: Clip.antiAlias,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (post.mediaUrl != null)
+          if (post.imageUrl != null)
             AspectRatio(
               aspectRatio: 16 / 9,
-              child: Image.network(post.mediaUrl!, fit: BoxFit.cover),
+              child: Image.network(post.imageUrl!, fit: BoxFit.cover),
             ),
           ListTile(
-            title: Row(
+            title: Text(post.content),
+            subtitle: Text(post.status.toUpperCase()),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(.1),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: statusColor.withOpacity(.4)),
-                  ),
-                  child: Text(
-                    post.status,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                IconButton(
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  onPressed: onComment,
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  '@${post.author.substring(0, post.author.length > 6 ? 6 : post.author.length)}…',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-              ],
-            ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(post.description),
-            ),
-            trailing: onDelete == null
-                ? null
-                : IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: onDelete,
-                  ),
-          ),
-          const Divider(height: 1),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              children: [
                 IconButton(
                   icon: const Icon(Icons.favorite_border),
                   onPressed: onLike,
                 ),
-                Text('${post.likes}'),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: onComment,
-                  icon: const Icon(Icons.comment_outlined),
-                  label: const Text('Comentarios'),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: onDelete,
                 ),
               ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Text(
+              'Likes: ${post.likes}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+              ),
             ),
           ),
         ],

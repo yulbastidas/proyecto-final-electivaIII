@@ -1,75 +1,111 @@
-import 'dart:io';
+// lib/data/repositories/feed_repository_impl.dart
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/config/supabase_config.dart';
-import '../../domain/entities/post_entity.dart';
-import '../../domain/entities/comment_entity.dart';
-import '../../domain/repositories/feed_repository.dart';
-import '../models/post_model.dart';
-import '../models/comment_model.dart';
-import '../services/storage_service.dart';
+import 'package:pets/domain/repositories/feed_repository.dart';
+import 'package:pets/data/models/post_model.dart';
+import 'package:pets/domain/entities/post.dart';
 
 class FeedRepositoryImpl implements FeedRepository {
-  final _client = SupabaseConfig.client;
-  final _storage = StorageService();
+  final SupabaseClient client;
+
+  /// Asegúrate de tener un bucket en Storage, p.ej. "posts"
+  final String bucketName;
+
+  FeedRepositoryImpl(this.client, {this.bucketName = 'posts'});
 
   @override
-  Future<List<PostEntity>> listPosts() async {
-    final rows = await _client
-        .from('posts')
-        .select()
-        .order('created_at', ascending: false);
-    return (rows as List).map((m) => PostModel.fromMap(m).toEntity()).toList();
-  }
-
-  @override
-  Future<int> createPost({
-    required String description,
-    required String status,
-    String? mediaUrl,
+  Future<List<Post>> getFeed({
+    String? status,
+    int limit = 30,
+    int offset = 0,
   }) async {
-    final uid = _client.auth.currentUser!.id;
-    final inserted = await _client
-        .from('posts')
-        .insert({
-          'author': uid,
-          'description': description,
-          'status': status,
-          'media_url': mediaUrl,
-          'country_code': 'CO',
-        })
-        .select('id')
-        .single();
-    return inserted['id'] as int;
-  }
+    // Aplica filtros ANTES de order(), porque eq no existe después de .order()
+    var sel = client.from('posts').select('*');
+    if (status != null && status.isNotEmpty) {
+      sel = sel.eq('status', status);
+    }
 
-  @override
-  Future<List<CommentEntity>> listComments(int postId) async {
-    final rows = await _client
-        .from('feed_comments')
-        .select()
-        .eq('post_id', postId)
-        .order('created_at');
-    return (rows as List)
-        .map((m) => CommentModel.fromMap(m).toEntity())
+    final List<dynamic> data = await sel
+        .order('created_at', ascending: false)
+        .range(offset, offset + limit - 1);
+
+    return data
+        .map((e) => PostModel.fromMap(Map<String, dynamic>.from(e)))
         .toList();
   }
 
   @override
-  Future<int> addComment({required int postId, required String text}) async {
-    final uid = _client.auth.currentUser!.id;
-    final row = await _client
-        .from('feed_comments')
-        .insert({'post_id': postId, 'author': uid, 'text': text})
-        .select('id')
-        .single();
-    return row['id'] as int;
+  Future<Post> createPost({
+    required String content,
+    required String status,
+    List<int>? imageBytes,
+    String? filename,
+  }) async {
+    String? imageUrl;
+
+    if (imageBytes != null && filename != null) {
+      final path = 'feed/$filename';
+      await client.storage
+          .from(bucketName)
+          .uploadBinary(
+            path,
+            Uint8List.fromList(imageBytes), // <- corrige List<int> -> Uint8List
+            fileOptions: const FileOptions(
+              upsert: true,
+              contentType: 'image/jpeg',
+            ),
+          );
+      imageUrl = client.storage.from(bucketName).getPublicUrl(path);
+    }
+
+    final userId = client.auth.currentUser?.id ?? 'anonymous';
+
+    final inserted =
+        await client
+                .from('posts')
+                .insert({
+                  'user_id': userId,
+                  'content': content,
+                  'status': status,
+                  'image_url': imageUrl,
+                })
+                .select()
+                .single()
+            as Map<String, dynamic>;
+
+    return PostModel.fromMap(inserted);
   }
 
   @override
-  Future<void> deleteOwnComment(int commentId) async {
-    await _client.from('feed_comments').delete().eq('id', commentId);
+  Future<Post> toggleLike({required String postId}) async {
+    // Evita condiciones no booleanas y operadores mal formados
+    final row =
+        await client
+                .from('posts')
+                .select('likes')
+                .eq('id', postId)
+                .maybeSingle()
+            as Map<String, dynamic>?;
+
+    final likesVal = row?['likes'];
+    final currentLikes = likesVal is int
+        ? likesVal
+        : int.tryParse('$likesVal') ?? 0;
+
+    final updated =
+        await client
+                .from('posts')
+                .update({'likes': currentLikes + 1})
+                .eq('id', postId)
+                .select()
+                .single()
+            as Map<String, dynamic>;
+
+    return PostModel.fromMap(updated);
   }
 
-  // helper opcional para subir imagen desde File
-  Future<String?> upload(File file) => _storage.uploadImage(file);
+  @override
+  Future<void> deletePost(String postId) async {
+    await client.from('posts').delete().eq('id', postId);
+  }
 }

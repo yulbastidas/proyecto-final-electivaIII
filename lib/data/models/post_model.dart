@@ -1,36 +1,44 @@
-class Post {
-  final String id;
-  final String author; // user id
-  final String description;
-  final String status; // RESCATADO | ADOPCION | VENTA
-  final String countryCode;
-  final String? mediaUrl;
-  final int likes;
-  final DateTime createdAt;
+// lib/data/models/post_model.dart
+import 'package:pets/domain/entities/post.dart';
 
-  Post({
-    required this.id,
-    required this.author,
-    required this.description,
-    required this.status,
-    required this.countryCode,
-    this.mediaUrl,
-    required this.likes,
-    required this.createdAt,
+class PostModel extends Post {
+  const PostModel({
+    required super.id,
+    required super.userId,
+    required super.content,
+    required super.status,
+    required super.likes,
+    required super.createdAt,
+    super.imageUrl,
   });
 
-  factory Post.fromMap(Map<String, dynamic> m) {
-    return Post(
-      id: '${m['id']}',
-      author: '${m['author']}',
-      description: '${m['description'] ?? ''}',
-      status: '${m['status'] ?? ''}',
-      countryCode: '${m['country_code'] ?? ''}',
-      mediaUrl: m['media_url'] as String?,
-      likes: (m['likes'] ?? 0) is int
-          ? m['likes'] as int
-          : int.tryParse('${m['likes']}') ?? 0,
-      createdAt: DateTime.tryParse('${m['created_at']}') ?? DateTime.now(),
+  factory PostModel.fromMap(Map<String, dynamic> map) {
+    return PostModel(
+      id: map['id'].toString(),
+      userId: map['user_id'].toString(),
+      content: (map['content'] ?? '').toString(),
+      status: (map['status'] ?? 'rescued').toString(),
+      likes: _asInt(map['likes']),
+      createdAt:
+          DateTime.tryParse(map['created_at']?.toString() ?? '') ??
+          DateTime.now(),
+      imageUrl: map['image_url']?.toString(),
     );
+  }
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'user_id': userId,
+    'content': content,
+    'status': status,
+    'likes': likes,
+    'created_at': createdAt.toIso8601String(),
+    'image_url': imageUrl,
+  };
+
+  static int _asInt(dynamic v) {
+    if (v is int) return v;
+    if (v == null) return 0;
+    return int.tryParse(v.toString()) ?? 0;
   }
 }

@@ -1,85 +1,75 @@
+// lib/data/services/posts_service.dart
 import 'dart:typed_data';
+import 'package:pets/domain/entities/post.dart';
+import 'package:pets/domain/repositories/feed_repository.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/config/supabase_config.dart';
-import '../models/post_model.dart';
 
 class PostsService {
-  final SupabaseClient _db = SupabaseConfig.client;
+  final FeedRepository repo;
+  PostsService(this.repo);
 
-  Future<String> _userCountry() async {
-    final uid = _db.auth.currentUser!.id;
-    final p = await _db
-        .from(SupabaseConfig.tableProfiles)
-        .select()
-        .eq('id', uid)
-        .single();
-    return (p['country_code'] ?? 'CO') as String;
-  }
+  // API limpia
+  Future<List<Post>> fetchFeed({
+    String? status,
+    int limit = 30,
+    int offset = 0,
+  }) => repo.getFeed(status: status, limit: limit, offset: offset);
 
-  Future<List<Post>> getLocalizedFeed() async {
-    final cc = await _userCountry();
-    final rows = await _db
-        .from(SupabaseConfig.tablePosts)
-        .select()
-        .eq('country_code', cc)
-        .order('created_at', ascending: false);
-    return (rows as List)
-        .map((e) => Post.fromMap(e as Map<String, dynamic>))
-        .toList();
-  }
+  Future<Post> publish({
+    required String content,
+    required String status,
+    List<int>? imageBytes,
+    String? filename,
+  }) => repo.createPost(
+    content: content,
+    status: status,
+    imageBytes: imageBytes,
+    filename: filename,
+  );
 
-  Future<String> uploadImageBytes({
-    required Uint8List bytes,
-    required String filename,
-    String contentType = 'image/jpeg',
+  Future<Post> likeToggle(String postId) => repo.toggleLike(postId: postId);
+  Future<void> remove(String postId) => repo.deletePost(postId);
+
+  // ---- Wrappers (compatibilidad con tu UI actual) ----
+  Future<List<Post>> getLocalizedFeed({
+    String? status,
+    int limit = 30,
+    int offset = 0,
+  }) => fetchFeed(status: status, limit: limit, offset: offset);
+
+  Future<Post> createPost({
+    required String content,
+    required String status,
+    List<int>? imageBytes,
+    String? filename,
+  }) => publish(
+    content: content,
+    status: status,
+    imageBytes: imageBytes,
+    filename: filename,
+  );
+
+  Future<Post> toggleLike(String postId) => likeToggle(postId);
+  Future<void> deletePost(String postId) => remove(postId);
+
+  /// Tu UI llama a esto directo: lo exponemos aquí.
+  Future<String?> uploadImageBytes(
+    List<int> bytes,
+    String filename, {
+    String bucket = 'posts',
   }) async {
-    final path = 'p_${DateTime.now().millisecondsSinceEpoch}_$filename';
-    await _db.storage
-        .from(SupabaseConfig.bucketPublic)
+    final client = Supabase.instance.client;
+    final path = 'feed/$filename';
+    await client.storage
+        .from(bucket)
         .uploadBinary(
           path,
-          bytes,
-          fileOptions: FileOptions(contentType: contentType, upsert: true),
+          Uint8List.fromList(bytes),
+          fileOptions: const FileOptions(
+            upsert: true,
+            contentType: 'image/jpeg',
+          ),
         );
-    return _db.storage.from(SupabaseConfig.bucketPublic).getPublicUrl(path);
+    return client.storage.from(bucket).getPublicUrl(path);
   }
-
-  Future<void> createPost({
-    required String description,
-    required String status,
-    String? mediaUrl,
-  }) async {
-    final uid = _db.auth.currentUser!.id;
-    final cc = await _userCountry();
-    await _db.from(SupabaseConfig.tablePosts).insert({
-      'author': uid,
-      'description': description,
-      'status': status,
-      'country_code': cc,
-      'media_url': mediaUrl,
-    });
-  }
-
-  Future<void> toggleLike(String postId, {required bool like}) async {
-    try {
-      await _db.rpc(
-        'increment_likes',
-        params: {'p_post_id': postId, 'p_delta': like ? 1 : -1},
-      );
-    } catch (_) {
-      final row = await _db
-          .from(SupabaseConfig.tablePosts)
-          .select('likes')
-          .eq('id', postId)
-          .maybeSingle();
-      final current = (row?['likes'] ?? 0) as int;
-      await _db
-          .from(SupabaseConfig.tablePosts)
-          .update({'likes': current + (like ? 1 : -1)})
-          .eq('id', postId);
-    }
-  }
-
-  Future<void> deletePost(String postId) =>
-      _db.from(SupabaseConfig.tablePosts).delete().eq('id', postId);
 }
