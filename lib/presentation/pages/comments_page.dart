@@ -1,42 +1,43 @@
 import 'package:flutter/material.dart';
-import '../../data/repositories/feed_repository_impl.dart';
-import '../../domain/entities/post_entity.dart';
-import '../../domain/entities/comment_entity.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CommentsPage extends StatefulWidget {
-  final PostEntity post;
-  const CommentsPage({super.key, required this.post});
+  final int postId;
+  const CommentsPage({super.key, required this.postId});
 
   @override
   State<CommentsPage> createState() => _CommentsPageState();
 }
 
 class _CommentsPageState extends State<CommentsPage> {
-  final repo = FeedRepositoryImpl();
+  final client = Supabase.instance.client;
   final text = TextEditingController();
-  List<CommentEntity> comments = [];
 
-  Future<void> _load() async {
-    comments = await repo.listComments(widget.post.id);
-    setState(() {});
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
+  Future<List<Map<String, dynamic>>> _fetch() async {
+    return await client
+        .from('feed_comments')
+        .select()
+        .eq('post_id', widget.postId)
+        .order('created_at');
   }
 
   Future<void> _send() async {
-    if (text.text.trim().isEmpty) return;
-    await repo.addComment(postId: widget.post.id, text: text.text.trim());
+    final uid = client.auth.currentUser?.id;
+    if (uid == null) return;
+    await client.from('feed_comments').insert({
+      'post_id': widget.postId,
+      'author': uid,
+      'text': text.text.trim(),
+    });
     text.clear();
-    await _load();
+    setState(() {});
   }
 
-  Future<void> _delete(CommentEntity c) async {
-    await repo.deleteOwnComment(c.id);
-    await _load();
+  Future<void> _delete(int id) async {
+    final uid = client.auth.currentUser?.id;
+    if (uid == null) return;
+    await client.from('feed_comments').delete().eq('id', id).eq('author', uid);
+    setState(() {});
   }
 
   @override
@@ -46,36 +47,41 @@ class _CommentsPageState extends State<CommentsPage> {
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              itemCount: comments.length,
-              itemBuilder: (_, i) {
-                final c = comments[i];
-                return ListTile(
-                  title: Text(c.text),
-                  subtitle: Text(c.createdAt.toIso8601String()),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () => _delete(c),
-                  ),
+            child: FutureBuilder(
+              future: _fetch(),
+              builder: (context, snap) {
+                if (!snap.hasData)
+                  return const Center(child: CircularProgressIndicator());
+                final list = snap.data as List<Map<String, dynamic>>;
+                return ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: list.length,
+                  itemBuilder: (_, i) {
+                    final c = list[i];
+                    return ListTile(
+                      title: Text(c['text'] ?? ''),
+                      subtitle: Text((c['created_at'] ?? '').toString()),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () => _delete(c['id'] as int),
+                      ),
+                    );
+                  },
                 );
               },
             ),
           ),
-          SafeArea(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             child: Row(
               children: [
                 Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: TextField(
-                      controller: text,
-                      decoration: const InputDecoration(
-                        hintText: 'Escribe un comentario...',
-                      ),
-                    ),
+                  child: TextField(
+                    controller: text,
+                    decoration: const InputDecoration(hintText: 'Escribe...'),
                   ),
                 ),
-                IconButton(onPressed: _send, icon: const Icon(Icons.send)),
+                IconButton(icon: const Icon(Icons.send), onPressed: _send),
               ],
             ),
           ),

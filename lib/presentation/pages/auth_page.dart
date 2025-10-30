@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/constants/app_colors.dart';
+import 'home_page.dart';
 
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
-
   @override
   State<AuthPage> createState() => _AuthPageState();
 }
@@ -12,28 +13,25 @@ class _AuthPageState extends State<AuthPage> {
   final email = TextEditingController();
   final pass = TextEditingController();
   bool loading = false;
-  bool signup = false;
+  String? error;
 
-  Future<void> _submit() async {
-    setState(() => loading = true);
+  Future<void> _signIn() async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
     try {
-      if (signup) {
-        await Supabase.instance.client.auth.signUp(
-          email: email.text.trim(),
-          password: pass.text.trim(),
-        );
-      } else {
-        await Supabase.instance.client.auth.signInWithPassword(
-          email: email.text.trim(),
-          password: pass.text.trim(),
-        );
-      }
+      await Supabase.instance.client.auth.signInWithPassword(
+        email: email.text.trim(),
+        password: pass.text.trim(),
+      );
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/home');
-    } catch (e) {
-      ScaffoldMessenger.of(
+      Navigator.pushReplacement(
         context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+        MaterialPageRoute(builder: (_) => const HomePage()),
+      );
+    } on AuthException catch (e) {
+      setState(() => error = e.message);
     } finally {
       setState(() => loading = false);
     }
@@ -42,47 +40,44 @@ class _AuthPageState extends State<AuthPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.bg,
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
+          constraints: const BoxConstraints(maxWidth: 380),
           child: Card(
-            margin: const EdgeInsets.all(24),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const SizedBox(height: 8),
-                  Text(
-                    'Pest • Login',
-                    style: Theme.of(context).textTheme.headlineSmall,
+                  const Text(
+                    'Pets — Inicio de sesión',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: email,
                     decoration: const InputDecoration(labelText: 'Email'),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: pass,
-                    decoration: const InputDecoration(labelText: 'Password'),
                     obscureText: true,
+                    decoration: const InputDecoration(labelText: 'Password'),
                   ),
-                  Row(
-                    children: [
-                      Checkbox(
-                        value: signup,
-                        onChanged: (v) => setState(() => signup = v ?? false),
-                      ),
-                      const Text('Crear cuenta'),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
+                  if (error != null)
+                    Text(error!, style: const TextStyle(color: Colors.red)),
+                  const SizedBox(height: 12),
                   FilledButton(
-                    onPressed: loading ? null : _submit,
-                    child: Text(
-                      loading ? '...' : (signup ? 'Register' : 'Login'),
-                    ),
+                    onPressed: loading ? null : _signIn,
+                    child: loading
+                        ? const CircularProgressIndicator()
+                        : const Text('Acceso'),
                   ),
                 ],
               ),

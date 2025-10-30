@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_colors.dart';
 import 'feed_page.dart';
-import 'marketplace_page.dart';
 import 'chat_page.dart';
 import 'map_page.dart';
 import 'health_log_page.dart';
+import 'marketplace_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
-
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  int i = 0;
+  int index = 0;
   final pages = const [
     FeedPage(),
-    MarketplacePage(),
+    Placeholder(), // Marketplace (puedes activarlo luego)
     ChatPage(),
     MapPage(),
     HealthLogPage(),
@@ -25,14 +25,20 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Mascotas')),
-      body: pages[i],
+      backgroundColor: AppColors.bg,
+      appBar: AppBar(
+        title: const Text('Mascotas'),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+      ),
+      body: pages[index],
       bottomNavigationBar: NavigationBar(
-        selectedIndex: i,
+        selectedIndex: index,
+        onDestinationSelected: (i) => setState(() => index = i),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.pets_outlined), label: 'Feed'),
           NavigationDestination(
-            icon: Icon(Icons.storefront_outlined),
+            icon: Icon(Icons.store_outlined),
             label: 'Marketplace',
           ),
           NavigationDestination(
@@ -41,11 +47,10 @@ class _HomePageState extends State<HomePage> {
           ),
           NavigationDestination(icon: Icon(Icons.map_outlined), label: 'Mapa'),
           NavigationDestination(
-            icon: Icon(Icons.favorite_outline),
-            label: 'Bitácora',
+            icon: Icon(Icons.medical_services_outlined),
+            label: 'Salud',
           ),
         ],
-        onDestinationSelected: (v) => setState(() => i = v),
       ),
     );
   }
