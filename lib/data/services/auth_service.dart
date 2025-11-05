@@ -1,3 +1,4 @@
+// lib/data/services/auth_service.dart
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthService {
@@ -8,19 +9,44 @@ class AuthService {
     required String email,
     required String password,
     String? fullName,
-  }) {
-    return _client.auth.signUp(
+    String? username,
+  }) async {
+    final res = await _client.auth.signUp(
       email: email,
       password: password,
-      data: fullName != null ? {'full_name': fullName} : null,
+      data: {
+        if (fullName != null) 'full_name': fullName,
+        if (username != null) 'username': username,
+      },
     );
+
+    final userId = res.user?.id ?? res.session?.user.id;
+    if (userId != null) {
+      // idempotente: inserta si no existe o actualiza si existe
+      await _client.from('profiles').upsert({
+        'id': userId,
+        'email': email,
+        'full_name': fullName,
+        'username': username ?? email.split('@').first,
+      });
+    }
+    return res;
   }
 
   Future<AuthResponse> signIn({
     required String email,
     required String password,
-  }) {
-    return _client.auth.signInWithPassword(email: email, password: password);
+  }) async {
+    final res = await _client.auth.signInWithPassword(
+      email: email,
+      password: password,
+    );
+
+    final userId = res.session?.user.id;
+    if (userId != null) {
+      await _client.from('profiles').upsert({'id': userId, 'email': email});
+    }
+    return res;
   }
 
   Future<void> signOut() => _client.auth.signOut();
