@@ -1,60 +1,110 @@
 // lib/presentation/controller/feed_controller.dart
-import 'package:flutter/foundation.dart';
-import 'package:pets/domain/entities/post.dart';
-import 'package:pets/data/services/posts_service.dart';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import '../../data/services/posts_service.dart';
+import '../../domain/entities/post.dart';
 
 class FeedController extends ChangeNotifier {
-  final PostsService service;
-  FeedController(this.service);
+  final PostsService _svc;
+  FeedController(this._svc);
 
-  final List<Post> items = [];
+  // --- Estado de UI ---
+  final TextEditingController textCtrl = TextEditingController();
+  String _status = 'Adoption';
+  Uint8List? _imageBytes;
+
   bool loading = false;
-  String? filterStatus; // 'rescued' | 'adoption' | 'sale'
+  bool publishing = false;
+  bool loadingMore = false;
 
-  Future<void> load({bool refresh = false}) async {
-    if (loading) return;
+  // --- Datos ---
+  List<Post> items = [];
+
+  // --- Getters/Setters usados por FeedPage ---
+  String get status => _status;
+  set status(String v) {
+    if (_status == v) return;
+    _status = v;
+    refresh(); // al cambiar la pestaña, refresca el feed
+  }
+
+  Uint8List? get imageBytes => _imageBytes;
+
+  // --- Helpers ---
+  void disposeAll() {
+    textCtrl.dispose();
+    _imageBytes = null;
+  }
+
+  void setImage(Uint8List? bytes) {
+    _imageBytes = bytes;
+    notifyListeners();
+  }
+
+  // --- Acciones ---
+  Future<void> refresh() async {
     loading = true;
-    if (refresh) items.clear();
     notifyListeners();
-
-    final data = await service.fetchFeed(
-      status: filterStatus,
-      limit: 30,
-      offset: items.length,
-    );
-    items.addAll(data);
-    loading = false;
-    notifyListeners();
-  }
-
-  Future<void> create({
-    required String content,
-    required String status,
-    List<int>? imageBytes,
-    String? filename,
-  }) async {
-    final post = await service.publish(
-      content: content,
-      status: status,
-      imageBytes: imageBytes,
-      filename: filename,
-    );
-    items.insert(0, post);
-    notifyListeners();
-  }
-
-  Future<void> toggleLike(String postId) async {
-    final updated = await service.likeToggle(postId);
-    final idx = items.indexWhere((e) => e.id == postId);
-    if (idx != -1) {
-      items[idx] = updated;
+    try {
+      // 👉 tu PostsService.fetchFeed NO acepta offset/limit: los quitamos
+      items = await _svc.fetchFeed(status: _status);
+    } finally {
+      loading = false;
       notifyListeners();
     }
   }
 
-  Future<void> delete(String postId) async {
-    await service.remove(postId);
+  Future<void> loadMore() async {
+    if (loadingMore) return;
+    loadingMore = true;
+    notifyListeners();
+    try {
+      // Si tu servicio no soporta paginación aún, hacemos un no-op corto.
+      // Cuando lo tengas, reemplaza por una llamada real a _svc.fetchMore(...)
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    } finally {
+      loadingMore = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> publish() async {
+    publishing = true;
+    notifyListeners();
+    try {
+      final created = await _svc.publish(
+        status: _status,
+        content: textCtrl.text.trim().isEmpty ? null : textCtrl.text.trim(),
+        imageBytes: _imageBytes,
+        filename: 'post_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        countryCode: 'CO',
+      );
+      items = [created, ...items];
+      textCtrl.clear();
+      _imageBytes = null;
+    } finally {
+      publishing = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> toggleLike(int postId) async {
+    final updated = await _svc.like(postId);
+    final i = items.indexWhere((e) => e.id == updated.id);
+    if (i != -1) {
+      items[i] = updated;
+      notifyListeners();
+    }
+  }
+
+  Future<void> remove(int postId) async {
+    await _svc.remove(postId);
     items.removeWhere((e) => e.id == postId);
     notifyListeners();
+  }
+
+  // Placeholder para comentarios (no rompe compilación si lo llamas).
+  Future<void> addCommentIfSupported(Post p, String text) async {
+    // Implementa aquí si luego agregas comentarios en el backend.
   }
 }

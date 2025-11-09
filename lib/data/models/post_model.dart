@@ -1,44 +1,39 @@
-// lib/data/models/post_model.dart
 import 'package:pets/domain/entities/post.dart';
 
 class PostModel extends Post {
   const PostModel({
     required super.id,
-    required super.userId,
-    required super.content,
     required super.status,
+    required super.mediaUrl,
+    required super.content,
     required super.likes,
+    required super.countryCode,
     required super.createdAt,
-    super.imageUrl,
   });
 
-  factory PostModel.fromMap(Map<String, dynamic> map) {
+  factory PostModel.fromMap(Map<String, dynamic> m) {
+    final likesVal = m['likes'];
+    final likes = likesVal is num
+        ? likesVal.toInt()
+        : int.tryParse('$likesVal') ?? 0;
+
     return PostModel(
-      id: map['id'].toString(),
-      userId: map['user_id'].toString(),
-      content: (map['content'] ?? '').toString(),
-      status: (map['status'] ?? 'rescued').toString(),
-      likes: _asInt(map['likes']),
-      createdAt:
-          DateTime.tryParse(map['created_at']?.toString() ?? '') ??
-          DateTime.now(),
-      imageUrl: map['image_url']?.toString(),
+      id: (m['id'] as num).toInt(),
+      status: (m['status'] ?? '').toString(),
+      mediaUrl: m['media_url'] as String?,
+      content:
+          m['content'] as String?, // puede venir null si no existe en tabla
+      likes: likes,
+      countryCode: m['country_code'] as String?,
+      createdAt: DateTime.parse(m['created_at'] as String),
     );
   }
 
-  Map<String, dynamic> toMap() => {
-    'id': id,
-    'user_id': userId,
-    'content': content,
+  Map<String, dynamic> toInsert() => {
     'status': status,
-    'likes': likes,
-    'created_at': createdAt.toIso8601String(),
-    'image_url': imageUrl,
+    if (mediaUrl != null) 'media_url': mediaUrl,
+    // Solo enviamos content si existe en tu tabla
+    if (content != null) 'content': content,
+    if (countryCode != null) 'country_code': countryCode,
   };
-
-  static int _asInt(dynamic v) {
-    if (v is int) return v;
-    if (v == null) return 0;
-    return int.tryParse(v.toString()) ?? 0;
-  }
 }

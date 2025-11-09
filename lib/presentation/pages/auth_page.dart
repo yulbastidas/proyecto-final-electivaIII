@@ -1,4 +1,3 @@
-// lib/presentation/pages/auth_page.dart
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/services/auth_service.dart';
@@ -14,6 +13,7 @@ class _AuthPageState extends State<AuthPage> {
   final _password = TextEditingController();
   final _username = TextEditingController();
   final _fullName = TextEditingController();
+
   bool _isLogin = false;
   bool _busy = false;
   String? _error;
@@ -26,11 +26,22 @@ class _AuthPageState extends State<AuthPage> {
     _auth = AuthService(Supabase.instance.client);
   }
 
+  @override
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    _username.dispose();
+    _fullName.dispose();
+    super.dispose();
+  }
+
   Future<void> _submit() async {
+    if (!mounted) return;
     setState(() {
       _busy = true;
       _error = null;
     });
+
     try {
       if (_isLogin) {
         await _auth.signIn(email: _email.text.trim(), password: _password.text);
@@ -46,13 +57,16 @@ class _AuthPageState extends State<AuthPage> {
               : _username.text.trim(),
         );
       }
-      // No navego manualmente: AuthGate detecta la sesión y cambia a Home.
+      // No navegamos manualmente; un AuthGate/Listener debe reaccionar a la sesión.
     } on AuthException catch (e) {
+      if (!mounted) return;
       setState(() => _error = e.message);
-    } catch (e) {
+    } catch (_) {
+      if (!mounted) return;
       setState(() => _error = 'Ocurrió un error. Intenta de nuevo.');
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (!mounted) return;
+      setState(() => _busy = false);
     }
   }
 

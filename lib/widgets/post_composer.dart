@@ -1,127 +1,109 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'app_text_field.dart';
-import 'primary_button.dart';
+import 'package:pets/widgets/app_text_field.dart';
+import 'package:pets/widgets/primary_button.dart';
 
-class PostComposer extends StatefulWidget {
-  final Future<void> Function({
-    required String description,
-    required String status,
-    Uint8List? imageBytes,
-    String? filename,
-  })
-  onCreate;
+class PostComposer extends StatelessWidget {
+  const PostComposer({
+    super.key,
+    required this.textCtrl,
+    required this.status,
+    required this.onChangeStatus,
+    required this.imageBytes,
+    required this.onPickImage,
+    required this.onRemoveImage,
+    required this.onPublish,
+    required this.publishing,
+  });
 
-  const PostComposer({super.key, required this.onCreate});
+  final TextEditingController textCtrl;
+  final String status;
+  final ValueChanged<String> onChangeStatus;
 
-  @override
-  State<PostComposer> createState() => _PostComposerState();
-}
+  final Uint8List? imageBytes;
+  final VoidCallback onPickImage;
+  final VoidCallback onRemoveImage;
 
-class _PostComposerState extends State<PostComposer> {
-  final _descCtrl = TextEditingController();
-  String _status = 'RESCATADO';
-  Uint8List? _bytes;
-  String? _filename;
-  bool _busy = false;
-
-  @override
-  void dispose() {
-    _descCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final f = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-    );
-    if (f == null) return;
-    _bytes = await f.readAsBytes();
-    _filename = f.name;
-    setState(() {});
-  }
-
-  Future<void> _submit() async {
-    if (_descCtrl.text.trim().isEmpty && _bytes == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Añade descripción o imagen.')),
-      );
-      return;
-    }
-    setState(() => _busy = true);
-    try {
-      await widget.onCreate(
-        description: _descCtrl.text.trim(),
-        status: _status,
-        imageBytes: _bytes,
-        filename: _filename,
-      );
-      _descCtrl.clear();
-      _bytes = null;
-      _filename = null;
-      setState(() {});
-    } finally {
-      setState(() => _busy = false);
-    }
-  }
+  final VoidCallback? onPublish;
+  final bool publishing;
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      elevation: 0.5,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           children: [
             AppTextField(
-              controller: _descCtrl,
-              label: 'Descripción',
+              label: '¿Qué estás pensando?',
+              controller: textCtrl,
               maxLines: 3,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    initialValue: _status, // sin warnings
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'RESCATADO',
-                        child: Text('Rescatado'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'ADOPCION',
-                        child: Text('En adopción'),
-                      ),
-                      DropdownMenuItem(value: 'VENTA', child: Text('En venta')),
-                    ],
-                    onChanged: (v) =>
-                        setState(() => _status = v ?? 'RESCATADO'),
+                    value: status,
                     decoration: const InputDecoration(
                       labelText: 'Estado',
                       border: OutlineInputBorder(),
-                      filled: true,
                     ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'adoption',
+                        child: Text('Adoption'),
+                      ),
+                      DropdownMenuItem(value: 'sale', child: Text('Sale')),
+                      DropdownMenuItem(
+                        value: 'rescued',
+                        child: Text('Rescued'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'all',
+                        child: Text('All (view only)'),
+                      ),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) onChangeStatus(v);
+                    },
                   ),
                 ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: _pickImage,
+                const SizedBox(width: 12),
+                IconButton.filledTonal(
+                  onPressed: onPickImage,
                   icon: const Icon(Icons.photo),
-                  label: Text(_filename == null ? 'Imagen' : '1 seleccionada'),
+                  tooltip: 'Elegir imagen',
                 ),
+                if (imageBytes != null)
+                  IconButton(
+                    onPressed: onRemoveImage,
+                    icon: const Icon(Icons.close),
+                    tooltip: 'Quitar imagen',
+                  ),
               ],
             ),
-            const SizedBox(height: 8),
+            if (imageBytes != null) ...[
+              const SizedBox(height: 12),
+              AspectRatio(
+                aspectRatio: 16 / 9,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.memory(
+                    imageBytes!,
+                    fit: BoxFit.cover, // estilo DALL·E
+                    filterQuality: FilterQuality.medium,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerRight,
               child: PrimaryButton(
-                text: 'Publicar',
-                onPressed: _busy ? null : _submit,
-                loading: _busy,
+                text: publishing ? 'Publicando...' : 'Publicar',
+                onPressed: publishing ? null : onPublish,
               ),
             ),
           ],

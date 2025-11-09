@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:pets/domain/entities/post.dart';
 
-class PostCard extends StatelessWidget {
+class PostItem extends StatelessWidget {
   final Post post;
-  final ValueChanged<int>? onLike;
-  final ValueChanged<int>? onDelete;
+  final VoidCallback? onLike;
+  final VoidCallback? onDelete;
+  final VoidCallback? onComment;
 
-  const PostCard({super.key, required this.post, this.onLike, this.onDelete});
+  const PostItem({
+    super.key,
+    required this.post,
+    this.onLike,
+    this.onDelete,
+    this.onComment,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -33,15 +40,20 @@ class PostCard extends StatelessWidget {
               children: [
                 IconButton(
                   icon: const Icon(Icons.favorite_border),
-                  onPressed: () => onLike?.call(post.id),
                   tooltip: 'Me gusta',
+                  onPressed: onLike,
                 ),
                 Text('${post.likes}'),
                 const Spacer(),
                 IconButton(
+                  icon: const Icon(Icons.mode_comment_outlined),
+                  tooltip: 'Comentar',
+                  onPressed: onComment,
+                ),
+                IconButton(
                   icon: const Icon(Icons.delete_outline),
-                  onPressed: () => onDelete?.call(post.id),
                   tooltip: 'Eliminar',
+                  onPressed: onDelete,
                 ),
               ],
             ),

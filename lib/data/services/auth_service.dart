@@ -22,13 +22,12 @@ class AuthService {
 
     final userId = res.user?.id ?? res.session?.user.id;
     if (userId != null) {
-      // idempotente: inserta si no existe o actualiza si existe
       await _client.from('profiles').upsert({
         'id': userId,
-        'email': email,
-        'full_name': fullName,
-        'username': username ?? email.split('@').first,
-      });
+        if (fullName != null) 'full_name': fullName,
+        'username': (username ?? email.split('@').first),
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'id'); // <-- clave
     }
     return res;
   }
@@ -44,7 +43,10 @@ class AuthService {
 
     final userId = res.session?.user.id;
     if (userId != null) {
-      await _client.from('profiles').upsert({'id': userId, 'email': email});
+      await _client.from('profiles').upsert({
+        'id': userId,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'id'); // <-- clave
     }
     return res;
   }

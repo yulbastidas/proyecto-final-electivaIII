@@ -1,4 +1,3 @@
-// lib/data/repositories/feed_repository_impl.dart
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pets/domain/repositories/feed_repository.dart';
@@ -7,8 +6,6 @@ import 'package:pets/domain/entities/post.dart';
 
 class FeedRepositoryImpl implements FeedRepository {
   final SupabaseClient client;
-
-  /// Asegúrate de tener un bucket en Storage, p.ej. "posts"
   final String bucketName;
 
   FeedRepositoryImpl(this.client, {this.bucketName = 'posts'});
@@ -19,16 +16,13 @@ class FeedRepositoryImpl implements FeedRepository {
     int limit = 30,
     int offset = 0,
   }) async {
-    // Aplica filtros ANTES de order(), porque eq no existe después de .order()
-    var sel = client.from('posts').select('*');
+    var q = client.from('posts').select('*');
     if (status != null && status.isNotEmpty) {
-      sel = sel.eq('status', status);
+      q = q.eq('status', status);
     }
-
-    final List<dynamic> data = await sel
+    final List data = await q
         .order('created_at', ascending: false)
         .range(offset, offset + limit - 1);
-
     return data
         .map((e) => PostModel.fromMap(Map<String, dynamic>.from(e)))
         .toList();
@@ -36,12 +30,13 @@ class FeedRepositoryImpl implements FeedRepository {
 
   @override
   Future<Post> createPost({
-    required String content,
+    String? content,
     required String status,
     List<int>? imageBytes,
     String? filename,
+    String? countryCode,
   }) async {
-    String? imageUrl;
+    String? mediaUrl;
 
     if (imageBytes != null && filename != null) {
       final path = 'feed/$filename';
@@ -49,63 +44,55 @@ class FeedRepositoryImpl implements FeedRepository {
           .from(bucketName)
           .uploadBinary(
             path,
-            Uint8List.fromList(imageBytes), // <- corrige List<int> -> Uint8List
+            Uint8List.fromList(imageBytes),
             fileOptions: const FileOptions(
               upsert: true,
               contentType: 'image/jpeg',
             ),
           );
-      imageUrl = client.storage.from(bucketName).getPublicUrl(path);
+      mediaUrl = client.storage.from(bucketName).getPublicUrl(path);
     }
 
-    final userId = client.auth.currentUser?.id ?? 'anonymous';
+    final inserted = await client
+        .from('posts')
+        .insert({
+          'status': status,
+          if (mediaUrl != null) 'media_url': mediaUrl,
+          if (content != null) 'content': content,
+          if (countryCode != null) 'country_code': countryCode,
+        })
+        .select()
+        .single();
 
-    final inserted =
-        await client
-                .from('posts')
-                .insert({
-                  'user_id': userId,
-                  'content': content,
-                  'status': status,
-                  'image_url': imageUrl,
-                })
-                .select()
-                .single()
-            as Map<String, dynamic>;
-
-    return PostModel.fromMap(inserted);
+    return PostModel.fromMap(Map<String, dynamic>.from(inserted));
   }
 
   @override
-  Future<Post> toggleLike({required String postId}) async {
-    // Evita condiciones no booleanas y operadores mal formados
-    final row =
-        await client
-                .from('posts')
-                .select('likes')
-                .eq('id', postId)
-                .maybeSingle()
-            as Map<String, dynamic>?;
-
+  Future<Post> toggleLike(int postId) async {
+    // Si no existe la columna 'likes' en DB, esto fallará. Añádela con:
+    // alter table public.posts add column if not exists likes int default 0;
+    final row = await client
+        .from('posts')
+        .select('likes')
+        .eq('id', postId)
+        .maybeSingle();
     final likesVal = row?['likes'];
-    final currentLikes = likesVal is int
-        ? likesVal
+    final current = likesVal is num
+        ? likesVal.toInt()
         : int.tryParse('$likesVal') ?? 0;
 
-    final updated =
-        await client
-                .from('posts')
-                .update({'likes': currentLikes + 1})
-                .eq('id', postId)
-                .select()
-                .single()
-            as Map<String, dynamic>;
+    final updated = await client
+        .from('posts')
+        .update({'likes': current + 1})
+        .eq('id', postId)
+        .select()
+        .single();
 
-    return PostModel.fromMap(updated);
+    return PostModel.fromMap(Map<String, dynamic>.from(updated));
   }
 
   @override
-  Future<void> deletePost(String postId) async {
+  Future<void> deletePost(int postId) async {
     await client.from('posts').delete().eq('id', postId);
   }
 }
