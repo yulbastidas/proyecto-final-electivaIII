@@ -76,9 +76,9 @@ class _FeedPageState extends State<FeedPage> {
 
     final bytes = await file.readAsBytes(); // Uint8List
     setState(() {
-      _imageBytes = bytes;
-      _imageForUpload = bytes.toList();
-      _imageName = '${_uuid.v4()}.jpg';
+      _imageBytes = bytes; // preview
+      _imageForUpload = bytes.toList(); // subida
+      _imageName = '${_uuid.v4()}.jpg'; // nombre archivo
     });
   }
 
@@ -287,7 +287,7 @@ class _Composer extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: Column(
           children: [
-            // ⬇⬇⬇ CORRECCIÓN: tu AppTextField requiere `label` (no `hintText`)
+            // ⬇⬇⬇ Mantengo tu AppTextField tal cual
             AppTextField(
               label: 'Escribe tu publicación',
               controller: contentCtrl,
@@ -298,7 +298,7 @@ class _Composer extends StatelessWidget {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    // ⬇⬇⬇ CORRECCIÓN: usar initialValue en vez de value (deprecado)
+                    // ⬇⬇⬇ Mantengo tu initialValue tal cual
                     initialValue: status,
                     decoration: const InputDecoration(
                       labelText: 'Status',
@@ -344,7 +344,10 @@ class _Composer extends StatelessWidget {
                 aspectRatio: 16 / 9,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.memory(imageBytes!, fit: BoxFit.cover),
+                  child: Image.memory(
+                    imageBytes!,
+                    fit: BoxFit.cover, // ✅ FIT estilo DALL·E
+                  ),
                 ),
               ),
             ],
