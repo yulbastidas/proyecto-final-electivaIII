@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../data/services/auth_service.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -18,29 +19,20 @@ class _SignUpPageState extends State<SignUpPage> {
     setState(() => _loading = true);
     try {
       final client = Supabase.instance.client;
-      final res = await client.auth.signUp(
+      final auth = AuthService(client);
+
+      final res = await auth.signUp(
         email: _email.text.trim(),
         password: _password.text,
+        username: _username.text.trim().isEmpty ? null : _username.text.trim(),
       );
-
-      // intenta crear/actualizar el profile
-      final userId = res.user?.id;
-      if (userId != null) {
-        await client.from('profiles').upsert({
-          'id': userId,
-          'username': _username.text.trim().isEmpty
-              ? null
-              : _username.text.trim(),
-        });
-      }
 
       if (!mounted) return;
 
       if (res.session != null) {
-        // sin confirmación de email → hay sesión
-        Navigator.pushReplacementNamed(context, '/feed');
+        // Vuelve al root para que tu AuthGate mande a HomePage (con todas las pestañas)
+        Navigator.pushNamedAndRemoveUntil(context, '/', (_) => false);
       } else {
-        // con confirmación → no hay sesión todavía
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Revisa tu correo para confirmar la cuenta'),
@@ -49,10 +41,17 @@ class _SignUpPageState extends State<SignUpPage> {
         Navigator.pushReplacementNamed(context, '/login');
       }
     } on AuthException catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(e.message)));
+    } on PostgrestException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error creando perfil: ${e.message}')),
+      );
     } catch (_) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error inesperado al registrar')),
       );
@@ -108,8 +107,9 @@ class _SignUpPageState extends State<SignUpPage> {
             ),
             const SizedBox(height: 12),
             TextButton(
-              onPressed: () =>
-                  Navigator.pushReplacementNamed(context, '/login'),
+              onPressed: _loading
+                  ? null
+                  : () => Navigator.pushReplacementNamed(context, '/login'),
               child: const Text('¿Ya tienes cuenta? Inicia sesión'),
             ),
           ],
