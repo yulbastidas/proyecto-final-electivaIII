@@ -1,94 +1,201 @@
 import 'package:flutter/material.dart';
+import '../../domain/entities/message_entity.dart';
+import '../controller/chat_controller.dart';
 
 class ChatPage extends StatefulWidget {
-  const ChatPage({super.key});
+  final String petId;
+  final ChatController controller;
+
+  const ChatPage({super.key, required this.petId, required this.controller});
+
   @override
   State<ChatPage> createState() => _ChatPageState();
 }
 
 class _ChatPageState extends State<ChatPage> {
-  final input = TextEditingController();
-  final messages = <_Msg>[
-    _Msg(
-      role: 'assistant',
-      text: 'Hola 👋 Soy tu asistente para orientación veterinaria general.',
-      time: DateTime.now(),
-    ),
-  ];
+  final _msgCtrl = TextEditingController();
 
-  void _send() {
-    final t = input.text.trim();
-    if (t.isEmpty) return;
-    setState(() {
-      messages.add(_Msg(role: 'user', text: t, time: DateTime.now()));
-      // respuesta fija (sin IA, por ahora)
-      messages.add(
-        _Msg(
-          role: 'assistant',
-          text:
-              'Gracias por tu mensaje. Recuerda: esta app NO reemplaza a un veterinario.\n'
-              'Si hay fiebre, vómito persistente, diarrea con sangre o decaimiento severo → acude a una clínica.',
-          time: DateTime.now(),
-        ),
-      );
-      input.clear();
-    });
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.loadSessions(widget.petId);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(12),
-            itemCount: messages.length,
-            itemBuilder: (_, i) {
-              final m = messages[i];
-              final isUser = m.role == 'user';
-              return Align(
-                alignment: isUser
-                    ? Alignment.centerRight
-                    : Alignment.centerLeft,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isUser ? Colors.deepPurple.shade100 : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(m.text),
-                ),
-              );
+    final ctrl = widget.controller;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Asistente Veterinario"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_comment_outlined),
+            tooltip: "Nueva sesión",
+            onPressed: () async {
+              await ctrl.createNewSession(widget.petId);
             },
           ),
-        ),
-        SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: input,
-                    decoration: const InputDecoration(
-                      hintText: 'Describe el síntoma...',
+        ],
+      ),
+      body: AnimatedBuilder(
+        animation: ctrl,
+        builder: (_, __) {
+          if (ctrl.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (ctrl.error != null) {
+            return Center(child: Text(ctrl.error!));
+          }
+
+          return Row(
+            children: [
+              // -------------------- SIDEBAR: SESIONES --------------------
+              Container(
+                width: 250,
+                color: Colors.grey.shade200,
+                child: Column(
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text(
+                        "Sesiones",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
+                    Expanded(
+                      child: ListView(
+                        children: ctrl.sessions.map((s) {
+                          final isSelected = ctrl.currentSession?.id == s.id;
+
+                          return ListTile(
+                            title: Text(
+                              s.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            selected: isSelected,
+                            onTap: () => ctrl.loadSession(s.id),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () => ctrl.deleteSession(s.id),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
                 ),
-                IconButton(icon: const Icon(Icons.send), onPressed: _send),
-              ],
-            ),
-          ),
-        ),
+              ),
+
+              // -------------------- CHAT AREA --------------------
+              Expanded(
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: ctrl.currentSession == null
+                          ? const Center(
+                              child: Text(
+                                "Selecciona o crea una sesión",
+                                style: TextStyle(fontSize: 16),
+                              ),
+                            )
+                          : _buildMessages(ctrl),
+                    ),
+                    if (ctrl.currentSession != null) _buildInputBar(ctrl),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // -------------------- MENSAJES --------------------
+  Widget _buildMessages(ChatController ctrl) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        ...ctrl.messages.map(_buildBubble),
+        if (ctrl.isTyping) _typingIndicator(),
       ],
     );
   }
-}
 
-class _Msg {
-  final String role, text;
-  final DateTime time;
-  _Msg({required this.role, required this.text, required this.time});
+  Widget _buildBubble(MessageEntity msg) {
+    final bool isUser = msg.role == 'user';
+
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.all(12),
+        constraints: const BoxConstraints(maxWidth: 280),
+        decoration: BoxDecoration(
+          color: isUser ? Colors.blueAccent : Colors.grey.shade300,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Text(
+          msg.message,
+          style: TextStyle(color: isUser ? Colors.white : Colors.black),
+        ),
+      ),
+    );
+  }
+
+  Widget _typingIndicator() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade300,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: const Text(
+          "El asistente está escribiendo...",
+          style: TextStyle(fontStyle: FontStyle.italic),
+        ),
+      ),
+    );
+  }
+
+  // -------------------- INPUT --------------------
+  Widget _buildInputBar(ChatController ctrl) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      color: Colors.grey.shade100,
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _msgCtrl,
+              decoration: const InputDecoration(
+                hintText: "Escribe un mensaje...",
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          IconButton(
+            icon: const Icon(Icons.send, color: Colors.blue),
+            onPressed: () async {
+              final text = _msgCtrl.text.trim();
+              if (text.isEmpty) return;
+
+              _msgCtrl.clear();
+              await ctrl.send(widget.petId, text);
+            },
+          ),
+        ],
+      ),
+    );
+  }
 }

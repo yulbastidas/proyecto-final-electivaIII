@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // ✅ AGREGADO
 
 import 'core/config/supabase_config.dart';
 import 'presentation/pages/auth_page.dart';
@@ -13,10 +14,13 @@ import 'presentation/pages/home_page.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Supabase
+  // 1️⃣ Cargar variables de entorno (.env)
+  await dotenv.load(fileName: ".env"); // ✅ AGREGADO
+
+  // 2️⃣ Inicializar Supabase
   await SupabaseConfig.init();
 
-  // Localización (fechas en español)
+  // 3️⃣ Localización (fechas en español)
   await initializeDateFormatting('es_CO');
   Intl.defaultLocale = 'es_CO';
 

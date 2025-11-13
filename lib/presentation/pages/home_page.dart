@@ -1,16 +1,22 @@
 // lib/presentation/pages/home_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+// Páginas
 import 'feed_page.dart';
 import 'map_page.dart';
 import 'health_log_page.dart';
 import 'chat_page.dart';
 import 'marketplace_page.dart';
 
-// Controller + repo
+// HEALTH
 import '../controller/health_controller.dart';
 import '../../data/repositories/health_repository_impl.dart';
+
+// CHAT
+import '../controller/chat_controller.dart';
+import '../../data/repositories/chat_repository_impl.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -23,6 +29,8 @@ class _HomePageState extends State<HomePage> {
   int _index = 0;
 
   late final HealthController _healthCtrl;
+  late final ChatController _chatCtrl;
+
   late final String _petId;
 
   @override
@@ -32,19 +40,26 @@ class _HomePageState extends State<HomePage> {
     final sb = Supabase.instance.client;
     final uid = sb.auth.currentUser?.id;
 
-    // Si no hay sesión, redirige a login según tu flujo
     if (uid == null) {
-      // Navigator.of(context).pushReplacementNamed('/login');  // si lo tienes
-      throw Exception('No hay sesión iniciada.');
+      throw Exception("No hay sesión activa.");
     }
 
-    // Si aún no tienes tabla "pets", usa el uid como pet_id (mismo tipo: uuid).
-    // Cuando tengas pets reales, reemplaza esto por el id del pet seleccionado.
+    // En tu sistema, _petId = uid
     _petId = uid;
 
+    // -------- HEALTH ----------
     _healthCtrl = HealthController(
       HealthRepositoryImpl(sb, () => sb.auth.currentUser!.id),
     );
+
+    // -------- CHAT ----------
+    // Tu ChatRepositoryImpl SOLO recibe (sb, getUid)
+    final chatRepo = ChatRepositoryImpl(
+      sb: sb,
+      getUid: () => sb.auth.currentUser!.id,
+    );
+
+    _chatCtrl = ChatController(chatRepo);
   }
 
   @override
@@ -52,8 +67,8 @@ class _HomePageState extends State<HomePage> {
     final pages = <Widget>[
       const FeedPage(),
       const MapPage(),
-      HealthLogPage(petId: _petId, controller: _healthCtrl), // ✅ ahora sí
-      const ChatPage(),
+      HealthLogPage(petId: _petId, controller: _healthCtrl),
+      ChatPage(petId: _petId, controller: _chatCtrl),
       const MarketplacePage(),
     ];
 

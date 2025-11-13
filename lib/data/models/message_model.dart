@@ -1,33 +1,61 @@
-import '../../domain/entities/message_entity.dart';
+import 'package:pets/domain/entities/message_entity.dart';
 
-class MessageModel {
-  final int id;
-  final String userId;
-  final String role;
-  final String text;
-  final DateTime createdAt;
-
+class MessageModel extends MessageEntity {
   MessageModel({
-    required this.id,
-    required this.userId,
-    required this.role,
-    required this.text,
-    required this.createdAt,
+    required super.id,
+    required super.sessionId,
+    required super.petId,
+    required super.userId,
+    required super.role,
+    required super.message,
+    required super.createdAt,
   });
 
-  factory MessageModel.fromMap(Map m) => MessageModel(
-    id: m['id'],
-    userId: m['user_id'],
-    role: m['role'],
-    text: m['text'],
-    createdAt: DateTime.parse(m['created_at']),
-  );
+  factory MessageModel.fromEntity(MessageEntity entity) {
+    return MessageModel(
+      id: entity.id,
+      sessionId: entity.sessionId,
+      petId: entity.petId,
+      userId: entity.userId,
+      role: entity.role,
+      message: entity.message,
+      createdAt: entity.createdAt,
+    );
+  }
 
-  MessageEntity toEntity() => MessageEntity(
-    id: id,
-    userId: userId,
-    role: role,
-    text: text,
-    createdAt: createdAt,
-  );
+  factory MessageModel.fromJson(Map<String, dynamic> json) {
+    return MessageModel(
+      id: json['id'] as String,
+      sessionId: json['session_id'] as String,
+      petId: json['pet_id'] as String,
+      userId: json['user_id'] as String,
+      role: json['role'] as String,
+      message: json['message'] as String,
+      createdAt: DateTime.parse(json['created_at'] as String),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'session_id': sessionId,
+      'pet_id': petId,
+      'user_id': userId,
+      'role': role,
+      'message': message,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
+
+  MessageEntity toEntity() {
+    return MessageEntity(
+      id: id,
+      sessionId: sessionId,
+      petId: petId,
+      userId: userId,
+      role: role,
+      message: message,
+      createdAt: createdAt,
+    );
+  }
 }
