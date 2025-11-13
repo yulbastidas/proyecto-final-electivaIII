@@ -29,14 +29,8 @@ class MapController extends ChangeNotifier {
   int? lastDurationMin;
 
   String routeMode = 'driving'; // 'driving' | 'walking'
-  bool openNowOnly = false;
-  int radiusMeters = 6000;
 
-  List<VetPlace> get filteredVets {
-    if (!openNowOnly) return vets;
-    final now = DateTime.now();
-    return vets.where((v) => v.is247 || v.isOpenNow(now)).toList();
-  }
+  List<VetPlace> get filteredVets => vets;
 
   Future<void> refresh() async {
     loading = true;
@@ -52,18 +46,9 @@ class MapController extends ChangeNotifier {
     }
   }
 
+  // 🔹 Ahora siempre carga veterinarias de Pasto (OSM)
   Future<void> fetchVets() async {
-    vets = await _vetsSvc.fetchNearby(
-      lat: cityCenter.latitude,
-      lon: cityCenter.longitude,
-      radiusMeters: radiusMeters,
-    );
-    final dist = const Distance();
-    vets.sort((a, b) {
-      final da = dist(LatLng(a.lat, a.lon), cityCenter);
-      final db = dist(LatLng(b.lat, b.lon), cityCenter);
-      return da.compareTo(db);
-    });
+    vets = await _vetsSvc.fetchPasto();
     notifyListeners();
   }
 
@@ -105,23 +90,5 @@ class MapController extends ChangeNotifier {
     if (selected != null) {
       await buildRouteTo(selected!);
     }
-  }
-
-  // ✅ método que faltaba
-  void setOpenNow(bool value) {
-    openNowOnly = value;
-    notifyListeners();
-  }
-
-  // ✅ debounce para evitar 429 en Overpass
-  Timer? _radiusDebounce;
-  Future<void> setRadius(int meters) async {
-    radiusMeters = meters;
-    notifyListeners(); // actualiza etiqueta del slider
-
-    _radiusDebounce?.cancel();
-    _radiusDebounce = Timer(const Duration(milliseconds: 700), () async {
-      await fetchVets();
-    });
   }
 }

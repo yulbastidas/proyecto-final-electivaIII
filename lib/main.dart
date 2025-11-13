@@ -1,6 +1,9 @@
 // lib/main.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/supabase_config.dart';
@@ -9,18 +12,33 @@ import 'presentation/pages/home_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Supabase
   await SupabaseConfig.init();
+
+  // Localización (fechas en español)
+  await initializeDateFormatting('es_CO');
+  Intl.defaultLocale = 'es_CO';
+
   runApp(const App());
 }
 
 class App extends StatelessWidget {
   const App({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Pets',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.purple),
+      locale: const Locale('es', 'CO'),
+      supportedLocales: const [Locale('es', 'CO'), Locale('es'), Locale('en')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       home: const AuthGate(),
     );
   }
@@ -56,6 +74,6 @@ class _AuthGateState extends State<AuthGate> {
   @override
   Widget build(BuildContext context) {
     if (_session == null) return const AuthPage(); // Login/Registro
-    return const HomePage(); // Tu navegación (feed, mapa, etc.)
+    return const HomePage(); // Navegación (feed, mapa, etc.)
   }
 }

@@ -1,41 +1,50 @@
 import '../../domain/entities/health_event_entity.dart';
 
 class HealthEventModel {
-  final int id;
-  final String owner;
-  final String kind;
-  final String? title;
-  final DateTime? dueAt;
-  final DateTime? lastAt;
-  final String? notes;
+  final String id;
+  final String userId;
+  final HealthKind kind; // en BD se llama "type"
+  final String title;
+  final DateTime happenedAt; // en BD es date; parsea OK
+  final String? details; // en BD se llama "notes"
 
-  HealthEventModel({
+  const HealthEventModel({
     required this.id,
-    required this.owner,
+    required this.userId,
     required this.kind,
-    this.title,
-    this.dueAt,
-    this.lastAt,
-    this.notes,
+    required this.title,
+    required this.happenedAt,
+    this.details,
   });
 
-  factory HealthEventModel.fromMap(Map m) => HealthEventModel(
-    id: m['id'],
-    owner: m['owner'],
-    kind: m['kind'],
-    title: m['title'],
-    dueAt: m['due_at'] == null ? null : DateTime.parse(m['due_at']),
-    lastAt: m['last_at'] == null ? null : DateTime.parse(m['last_at']),
-    notes: m['notes'],
-  );
+  // columnas reales en la BD
+  static const selectColumns = 'id,user_id,type,title,happened_at,notes';
 
-  HealthEventEntity toEntity() => HealthEventEntity(
+  factory HealthEventModel.fromMap(Map<String, dynamic> m) {
+    return HealthEventModel(
+      id: m['id'].toString(), // bigint -> String
+      userId: m['user_id'] as String,
+      kind: healthKindFromString(m['type'] as String),
+      title: m['title'] as String,
+      happenedAt: DateTime.parse(m['happened_at'] as String),
+      details: m['notes'] as String?, // mapear notes -> details
+    );
+  }
+
+  Map<String, dynamic> toInsert(String uid) => {
+    'user_id': uid,
+    'type': healthKindToString(kind), // usamos "type" de la BD
+    'title': title,
+    'happened_at': happenedAt.toIso8601String(),
+    if (details != null && details!.trim().isNotEmpty) 'notes': details,
+  };
+
+  HealthEvent toEntity() => HealthEvent(
     id: id,
-    owner: owner,
+    userId: userId,
     kind: kind,
     title: title,
-    dueAt: dueAt,
-    lastAt: lastAt,
-    notes: notes,
+    happenedAt: happenedAt,
+    details: details,
   );
 }

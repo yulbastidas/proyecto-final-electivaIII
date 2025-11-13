@@ -56,69 +56,54 @@ class _MapPageState extends State<MapPage> {
             ),
           ];
 
-    // Marcadores de veterinarias
-    final vetMarkers = c.filteredVets.map((VetPlace v) {
-      final open = v.is247 || v.isOpenNow(DateTime.now());
+    // Marcadores de veterinarias (bonitos)
+    final vetMarkers = c.vets.map((VetPlace v) {
       return fmap.Marker(
         point: LatLng(v.lat, v.lon),
-        width: 46,
-        height: 46,
-        child: InkWell(
-          onTap: () async {
-            await c.buildRouteTo(v);
-            if (c.route.isNotEmpty) {
-              final b = fmap.LatLngBounds.fromPoints([
-                c.cityCenter,
-                ...c.route,
-                LatLng(v.lat, v.lon),
-              ]);
-              _mapCtrl.fitCamera(
-                fmap.CameraFit.bounds(
-                  bounds: b,
-                  padding: const EdgeInsets.all(48),
+        width: 48,
+        height: 48,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () async {
+              await c.buildRouteTo(v);
+              if (c.route.isNotEmpty) {
+                final b = fmap.LatLngBounds.fromPoints([
+                  c.cityCenter,
+                  ...c.route,
+                  LatLng(v.lat, v.lon),
+                ]);
+                _mapCtrl.fitCamera(
+                  fmap.CameraFit.bounds(
+                    bounds: b,
+                    padding: const EdgeInsets.all(48),
+                  ),
+                );
+              } else {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('No se pudo calcular la ruta')),
+                );
+              }
+            },
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // pin
+                const Icon(
+                  Icons.location_on_rounded,
+                  size: 44,
+                  color: Color(0xFFE53935),
                 ),
-              );
-            } else {
-              if (!context.mounted) return; // ✅ context.mounted
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('No se pudo calcular la ruta')),
-              );
-            }
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Icon(
-                Icons.location_on_rounded,
-                size: 42,
-                color: open ? Colors.green : Colors.red,
-              ),
-              const Icon(Icons.pets, size: 16, color: Colors.white),
-            ],
+                // ícono
+                const Icon(Icons.pets, size: 16, color: Colors.white),
+              ],
+            ),
           ),
         ),
       );
     }).toList();
-
-    // Círculo del radio de búsqueda (centrado en Pasto)
-    final radiusCircle = fmap.CircleLayer(
-      circles: [
-        fmap.CircleMarker(
-          point: c.cityCenter,
-          useRadiusInMeter: true,
-          radius: c.radiusMeters.toDouble(),
-          color: theme.colorScheme.primary.withValues(alpha: 0.10),
-          borderStrokeWidth: 1.5,
-          borderColor: theme.colorScheme.primary.withValues(alpha: 0.35),
-        ),
-      ],
-    );
-
-    final hasRoute =
-        c.route.isNotEmpty &&
-        c.lastDistanceKm != null &&
-        c.lastDurationMin != null;
 
     return Scaffold(
       appBar: AppBar(
@@ -133,6 +118,7 @@ class _MapPageState extends State<MapPage> {
       ),
       body: Stack(
         children: [
+          // Mapa OSM
           fmap.FlutterMap(
             mapController: _mapCtrl,
             options: fmap.MapOptions(
@@ -144,13 +130,14 @@ class _MapPageState extends State<MapPage> {
             ),
             children: [
               fmap.TileLayer(
+                // sin subdominios (menos warnings en web)
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.pets.app',
                 retinaMode: true,
                 minZoom: 3,
                 maxZoom: 19,
               ),
-              radiusCircle,
+              // Ruta dibujada (si existe)
               fmap.PolylineLayer(
                 polylines: [
                   if (c.route.isNotEmpty)
@@ -163,26 +150,12 @@ class _MapPageState extends State<MapPage> {
                     ),
                 ],
               ),
+              // Marcadores
               fmap.MarkerLayer(markers: [...meMarker, ...vetMarkers]),
-              fmap.MarkerLayer(
-                markers: [
-                  fmap.Marker(
-                    point: app.MapController.kPastoCenter,
-                    width: 16,
-                    height: 16,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.deepPurple.withValues(alpha: 0.12),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.deepPurple, width: 1),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
 
+          // Cargando
           if (c.loading)
             const Positioned.fill(
               child: IgnorePointer(
@@ -190,40 +163,7 @@ class _MapPageState extends State<MapPage> {
               ),
             ),
 
-          if (hasRoute)
-            Positioned(
-              top: 12,
-              left: 12,
-              right: 12,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width - 32,
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                    child: Text(
-                      '${c.lastDistanceKm!.toStringAsFixed(1)} km • ${c.lastDurationMin} min — ${c.routeMode == 'walking' ? 'Segura (a pie)' : 'Rápida (carro)'}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-          // Panel inferior (scrollable)
+          // Panel inferior: limpio, sin filtros extras
           Positioned.fill(
             child: SafeArea(
               top: false,
@@ -233,17 +173,17 @@ class _MapPageState extends State<MapPage> {
                 minChildSize: 0.18,
                 maxChildSize: 0.64,
                 builder: (context, scrollController) {
-                  final theme = Theme.of(context);
                   return Material(
                     color: theme.colorScheme.surface,
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(22),
                     ),
-                    elevation: 4,
+                    elevation: 6,
                     child: ListView(
                       controller: scrollController,
                       padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
                       children: [
+                        // handle
                         Center(
                           child: Container(
                             width: 36,
@@ -256,106 +196,78 @@ class _MapPageState extends State<MapPage> {
                         ),
                         const SizedBox(height: 10),
 
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            FilterChip(
-                              label: const Text('Abiertas ahora'),
-                              selected: c.openNowOnly,
-                              onSelected: (v) =>
-                                  c.setOpenNow(v), // ✅ ahora existe
-                            ),
-                            SegmentedButton<String>(
-                              segments: const [
-                                ButtonSegment(
-                                  value: 'driving',
-                                  label: Text('Rápida'),
-                                ),
-                                ButtonSegment(
-                                  value: 'walking',
-                                  label: Text('Segura'),
-                                ),
-                              ],
-                              selected: {c.routeMode},
-                              onSelectionChanged: (s) =>
-                                  c.setRouteMode(s.first),
-                            ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  tooltip: 'Centrar Pasto',
-                                  onPressed: () => _mapCtrl.move(
-                                    app.MapController.kPastoCenter,
-                                    14,
-                                  ),
-                                  icon: const Icon(Icons.map),
-                                ),
-                                if (c.me != null)
-                                  IconButton(
-                                    tooltip: 'Mi ubicación',
-                                    onPressed: () => _mapCtrl.move(c.me!, 15),
-                                    icon: const Icon(Icons.my_location),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 8),
-
+                        // Controles mínimos
                         Row(
                           children: [
-                            const Icon(Icons.radar),
                             Expanded(
-                              child: Slider(
-                                value: c.radiusMeters.toDouble(),
-                                min: 3000,
-                                max: 10000,
-                                divisions: 7,
-                                label:
-                                    '${(c.radiusMeters / 1000).toStringAsFixed(1)} km',
-                                onChanged: (v) => c.setRadius(v.round()),
+                              child: SegmentedButton<String>(
+                                segments: const [
+                                  ButtonSegment(
+                                    value: 'driving',
+                                    label: Text('Rápida'),
+                                  ),
+                                  ButtonSegment(
+                                    value: 'walking',
+                                    label: Text('Segura'),
+                                  ),
+                                ],
+                                selected: {c.routeMode},
+                                onSelectionChanged: (s) =>
+                                    c.setRouteMode(s.first),
                               ),
                             ),
-                            Text(
-                              '${(c.radiusMeters / 1000).toStringAsFixed(1)} km',
+                            const SizedBox(width: 8),
+                            IconButton.filledTonal(
+                              tooltip: 'Centrar Pasto',
+                              onPressed: () => _mapCtrl.move(
+                                app.MapController.kPastoCenter,
+                                14,
+                              ),
+                              icon: const Icon(Icons.center_focus_strong),
                             ),
+                            const SizedBox(width: 6),
+                            if (c.me != null)
+                              IconButton.filled(
+                                tooltip: 'Mi ubicación',
+                                onPressed: () => _mapCtrl.move(c.me!, 15),
+                                icon: const Icon(Icons.my_location),
+                              ),
                           ],
                         ),
 
+                        const SizedBox(height: 12),
+                        Text(
+                          'Veterinarias en Pasto',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                         const SizedBox(height: 6),
 
-                        if (c.filteredVets.isEmpty)
+                        if (c.vets.isEmpty)
                           const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 24),
+                            padding: EdgeInsets.symmetric(vertical: 22),
                             child: Center(
-                              child: Text(
-                                'No se encontraron veterinarias en Pasto con los filtros actuales.',
-                              ),
+                              child: Text('Cargando o sin resultados…'),
                             ),
                           )
                         else
                           ListView.separated(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            itemCount: c.filteredVets.length,
+                            itemCount: c.vets.length,
                             separatorBuilder: (_, __) =>
                                 const Divider(height: 1),
                             itemBuilder: (context, i) {
-                              final v = c.filteredVets[i];
-                              final open =
-                                  v.is247 || v.isOpenNow(DateTime.now());
+                              final v = c.vets[i];
                               return ListTile(
                                 leading: CircleAvatar(
-                                  backgroundColor: open
-                                      ? Colors.green.withValues(alpha: 0.15)
-                                      : Colors.red.withValues(alpha: 0.15),
-                                  child: Icon(
+                                  backgroundColor: const Color(
+                                    0xFFE53935,
+                                  ).withValues(alpha: 0.12),
+                                  child: const Icon(
                                     Icons.pets,
-                                    color: open ? Colors.green : Colors.red,
+                                    color: Color(0xFFE53935),
                                   ),
                                 ),
                                 title: Text(
@@ -363,14 +275,9 @@ class _MapPageState extends State<MapPage> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                subtitle: Text(
-                                  v.openingHours == null
-                                      ? (open
-                                            ? 'Abierta ahora'
-                                            : 'Horario no disponible')
-                                      : '${open ? 'Abierta' : 'Cerrada'} • ${v.openingHours}',
-                                  maxLines: 2,
-                                ),
+                                subtitle: v.openingHours == null
+                                    ? const Text('Veterinaria')
+                                    : Text(v.openingHours!, maxLines: 2),
                                 trailing: FilledButton(
                                   onPressed: () async {
                                     await c.buildRouteTo(v);
@@ -386,8 +293,7 @@ class _MapPageState extends State<MapPage> {
                                         ),
                                       );
                                     } else {
-                                      if (!context.mounted)
-                                        return; // ✅ context.mounted
+                                      if (!context.mounted) return;
                                       ScaffoldMessenger.of(
                                         context,
                                       ).showSnackBar(

@@ -13,12 +13,11 @@ class SupabaseConfig {
   static Future<void> init() async {
     if (_initialized) return;
 
-    // Carga .env (si ya está cargado, no falla)
+    // Carga .env (si ya estaba cargado, no truena)
     try {
       await dotenv.load(fileName: '.env');
     } catch (_) {
-      // Si ya estaba cargado o si corres en producción sin assets,
-      // simplemente seguimos y leemos variables del proceso si existieran.
+      // Ignorar: en web o producción puede venir precargado
     }
 
     final url = dotenv.env['SUPABASE_URL'];
@@ -28,9 +27,14 @@ class SupabaseConfig {
       throw Exception('Faltan SUPABASE_URL o SUPABASE_ANON_KEY en .env');
     }
 
-    await Supabase.initialize(url: url, anonKey: anonKey);
+    await Supabase.initialize(
+      url: url,
+      anonKey: anonKey,
+      // opcional: puedes ajustar schema/Auth si lo necesitas
+    );
+
     _initialized = true;
-    log('Supabase inicializado');
+    _dbg('Supabase inicializado');
   }
 
   /// Cliente global
@@ -44,7 +48,7 @@ class SupabaseConfig {
   static const String tableMarket = 'market_items';
 
   /// Logger solo en debug
-  static void log(String message) {
+  static void _dbg(String message) {
     if (kDebugMode) dev.log(message, name: 'SupabaseConfig');
   }
 }

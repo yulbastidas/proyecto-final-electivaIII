@@ -1,13 +1,15 @@
-class WeightEntity {
-  final int id;
-  final String owner;
+class Weight {
+  final String id;
+  final String petId;
   final double kg;
-  final DateTime at;
+  final DateTime notedAt;
+  final String? note;
 
-  WeightEntity({
+  const Weight({
     required this.id,
-    required this.owner,
+    required this.petId,
     required this.kg,
-    required this.at,
+    required this.notedAt,
+    this.note,
   });
 }
