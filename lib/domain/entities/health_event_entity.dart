@@ -1,20 +1,15 @@
-// lib/domain/entities/health_event_entity.dart
-
-/// Tipos de evento de salud admitidos.
-enum HealthKind {
+/// Tipos de evento de salud admitidos (SOLO estos 3)
+enum HealthType {
   vaccine, // vacuna
   deworm, // desparasitación
-  surgery, // cirugía
-  checkup, // chequeo general
-  medication, // medicación
-  other, // otros
+  med, // medicación
 }
 
 /// Entidad de EVENTO DE SALUD (dominio)
 class HealthEvent {
   final String id;
   final String userId;
-  final HealthKind kind;
+  final HealthType type;
   final String title;
   final DateTime happenedAt;
   final String? details;
@@ -22,53 +17,53 @@ class HealthEvent {
   const HealthEvent({
     required this.id,
     required this.userId,
-    required this.kind,
+    required this.type,
     required this.title,
     required this.happenedAt,
     this.details,
   });
 }
 
-/// Helper: parsea string → HealthKind (case-insensitive, incluye alias comunes)
-HealthKind healthKindFromString(String? raw) {
+/// Helper: string → HealthType
+HealthType healthTypeFromString(String? raw) {
   final v = (raw ?? '').trim().toLowerCase();
 
-  // Coincidencia directa con .name
-  for (final k in HealthKind.values) {
-    if (k.name == v) return k;
+  // Coincidencia directa: vaccine, deworm, med
+  for (final t in HealthType.values) {
+    if (t.name == v) return t;
   }
 
-  // Aliases
+  // Aliases español e inglés
   switch (v) {
     case 'vacuna':
     case 'vaccine':
-      return HealthKind.vaccine;
+      return HealthType.vaccine;
 
-    case 'desparasitacion':
     case 'desparasitación':
+    case 'desparasitacion':
     case 'deworm':
-      return HealthKind.deworm;
+      return HealthType.deworm;
 
-    case 'cirugia':
-    case 'cirugía':
-    case 'surgery':
-      return HealthKind.surgery;
-
-    case 'chequeo':
-    case 'check':
-    case 'checkup':
-      return HealthKind.checkup;
-
+    case 'medicación':
+    case 'medicacion':
+    case 'medication':
     case 'med':
     case 'meds':
-    case 'medicacion':
-    case 'medicación':
-    case 'medication':
-      return HealthKind.medication;
+      return HealthType.med;
   }
 
-  return HealthKind.other;
+  // Si llega algo inesperado → por seguridad devolvemos med
+  return HealthType.med;
 }
 
-/// Helper inverso: HealthKind → string a guardar en DB
-String healthKindToString(HealthKind k) => k.name;
+/// Helper inverso: HealthType → string válido para Supabase
+String healthTypeToString(HealthType t) {
+  switch (t) {
+    case HealthType.vaccine:
+      return 'vaccine';
+    case HealthType.deworm:
+      return 'deworm';
+    case HealthType.med:
+      return 'med';
+  }
+}

@@ -3,40 +3,40 @@ import '../../domain/entities/weight_entity.dart';
 class WeightModel {
   final String id;
   final String petId;
-  final double kg;
+  final String userId;
+  final double valueKg; // ✅
   final DateTime notedAt;
-  final String? note;
+  final String? notes; // ✅
 
   const WeightModel({
     required this.id,
     required this.petId,
-    required this.kg,
+    required this.userId,
+    required this.valueKg,
     required this.notedAt,
-    this.note,
+    this.notes,
   });
 
-  // Columnas exactas de la tabla
-  static const selectColumns = 'id,pet_id,kg,noted_at,note';
+  // ✅ columnas EXACTAS de la tabla weights
+  static const selectColumns = 'id, pet_id, user_id, noted_at, value_kg, notes';
 
   factory WeightModel.fromMap(Map<String, dynamic> m) {
     return WeightModel(
       id: m['id'].toString(),
       petId: m['pet_id'] as String,
-      kg: (m['kg'] as num).toDouble(),
+      userId: m['user_id'] as String,
+      valueKg: (m['value_kg'] as num).toDouble(), // ✅ value_kg
       notedAt: DateTime.parse(m['noted_at'] as String),
-      note: m['note'] as String?,
+      notes: m['notes'] as String?, // ✅ notes
     );
   }
 
-  Map<String, dynamic> toInsert({required String uid, required String petId}) =>
-      {
-        'owner': uid, // para pasar RLS
-        'pet_id': petId,
-        'kg': kg,
-        if (note != null && note!.trim().isNotEmpty) 'note': note,
-        // 'noted_at' lo pone el default now()
-      };
-
-  Weight toEntity() =>
-      Weight(id: id, petId: petId, kg: kg, notedAt: notedAt, note: note);
+  Weight toEntity() => Weight(
+    id: id,
+    petId: petId,
+    userId: userId,
+    valueKg: valueKg,
+    notedAt: notedAt,
+    notes: notes,
+  );
 }

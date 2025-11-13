@@ -1,15 +1,17 @@
 class Weight {
   final String id;
   final String petId;
-  final double kg;
+  final String userId;
+  final double valueKg; // ✅ usa valueKg
   final DateTime notedAt;
-  final String? note;
+  final String? notes; // ✅ notes
 
   const Weight({
     required this.id,
     required this.petId,
-    required this.kg,
+    required this.userId,
+    required this.valueKg,
     required this.notedAt,
-    this.note,
+    this.notes,
   });
 }
