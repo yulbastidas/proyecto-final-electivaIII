@@ -1,7 +1,7 @@
 // ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'dart:typed_data';
+
 import 'dart:html' as html; // Solo web; si te molesta el warning, déjalo así.
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -204,7 +204,7 @@ class _FeedPageState extends State<FeedPage> {
                       post: p,
                       onLike: () => c.toggleLike(p.id), // usa int id
                       onDelete: () => c.remove(p.id),
-                      onComment: () {
+                      onComment: (text) {
                         // c.addCommentIfSupported(p, '¡Bonito!');
                       },
                     );

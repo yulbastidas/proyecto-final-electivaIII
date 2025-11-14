@@ -1,4 +1,4 @@
-import '../../domain/entities/comment_entity.dart';
+import 'package:pets/domain/entities/comment_entity.dart';
 
 class CommentModel {
   final int id;
@@ -15,13 +15,15 @@ class CommentModel {
     required this.createdAt,
   });
 
-  factory CommentModel.fromMap(Map m) => CommentModel(
-    id: m['id'],
-    postId: m['post_id'],
-    author: m['author'],
-    text: m['text'],
-    createdAt: DateTime.parse(m['created_at']),
-  );
+  factory CommentModel.fromMap(Map<String, dynamic> m) {
+    return CommentModel(
+      id: m['id'],
+      postId: m['post_id'],
+      author: m['author'],
+      text: m['body'],
+      createdAt: DateTime.parse(m['created_at']),
+    );
+  }
 
   CommentEntity toEntity() => CommentEntity(
     id: id,
