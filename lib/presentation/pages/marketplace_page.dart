@@ -24,7 +24,7 @@ class _MarketplacePageState extends State<MarketplacePage> {
     try {
       _items = await _svc.getAll();
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -32,21 +32,22 @@ class _MarketplacePageState extends State<MarketplacePage> {
     required String title,
     required String description,
     required double price,
-    required String status,
     Uint8List? imageBytes,
     String? filename,
   }) async {
     String? url;
+
     if (imageBytes != null && filename != null) {
       url = await _svc.uploadImageBytes(bytes: imageBytes, filename: filename);
     }
+
     await _svc.create(
       title: title,
       description: description,
       price: price,
-      status: status,
       imageUrl: url,
     );
+
     await _load();
   }
 
@@ -80,13 +81,11 @@ class _MarketplacePageState extends State<MarketplacePage> {
   }
 }
 
-/// Formulario para crear una publicación de marketplace
 class _Composer extends StatefulWidget {
   final Future<void> Function({
     required String title,
     required String description,
     required double price,
-    required String status,
     Uint8List? imageBytes,
     String? filename,
   })
@@ -102,7 +101,7 @@ class _ComposerState extends State<_Composer> {
   final _title = TextEditingController();
   final _desc = TextEditingController();
   final _price = TextEditingController();
-  String _status = 'sale';
+
   Uint8List? _bytes;
   String? _filename;
   bool _submitting = false;
@@ -113,37 +112,39 @@ class _ComposerState extends State<_Composer> {
       imageQuality: 85,
     );
     if (x == null) return;
-    final b = await x.readAsBytes();
-    setState(() {
-      _bytes = b;
-      _filename = x.name;
-    });
+
+    _bytes = await x.readAsBytes();
+    _filename = x.name;
+    if (mounted) setState(() {});
   }
 
   Future<void> _submit() async {
     final p = double.tryParse(_price.text.trim()) ?? 0;
+
     if (_title.text.trim().isEmpty || _desc.text.trim().isEmpty) return;
 
+    if (!mounted) return;
     setState(() => _submitting = true);
+
     try {
       await widget.onCreate(
         title: _title.text.trim(),
         description: _desc.text.trim(),
         price: p,
-        status: _status,
         imageBytes: _bytes,
         filename: _filename,
       );
+    } finally {
+      if (!mounted) return;
+
       _title.clear();
       _desc.clear();
       _price.clear();
-      setState(() {
-        _status = 'sale';
-        _bytes = null;
-        _filename = null;
-      });
-    } finally {
-      if (mounted) setState(() => _submitting = false);
+      _bytes = null;
+      _filename = null;
+      _submitting = false;
+
+      setState(() {});
     }
   }
 
@@ -171,24 +172,22 @@ class _ComposerState extends State<_Composer> {
                 ),
               ],
             ),
+
             const SizedBox(height: 8),
             AppTextField(controller: _desc, label: 'Descripción', maxLines: 3),
+
+            const SizedBox(height: 8),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Venta',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+            ),
+
             const SizedBox(height: 8),
             Row(
               children: [
-                DropdownButton<String>(
-                  value: _status,
-                  items: const [
-                    DropdownMenuItem(value: 'sale', child: Text('Venta')),
-                    DropdownMenuItem(
-                      value: 'adoption',
-                      child: Text('Adopción'),
-                    ),
-                    DropdownMenuItem(value: 'rescue', child: Text('Rescate')),
-                  ],
-                  onChanged: (v) => setState(() => _status = v ?? 'sale'),
-                ),
-                const SizedBox(width: 12),
                 OutlinedButton.icon(
                   onPressed: _pick,
                   icon: const Icon(Icons.photo),
@@ -202,6 +201,7 @@ class _ComposerState extends State<_Composer> {
                 ),
               ],
             ),
+
             if (_bytes != null) ...[
               const SizedBox(height: 8),
               ClipRRect(

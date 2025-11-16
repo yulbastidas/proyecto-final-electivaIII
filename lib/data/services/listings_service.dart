@@ -4,9 +4,7 @@ import '../../core/config/supabase_config.dart';
 import '../models/listing.dart';
 
 class ListingsService {
-  // Usa el bucket que ya tengas. Intento primero 'pets-media' y luego 'public'.
   static const _candidatesBuckets = ['media'];
-
   final SupabaseClient _client = SupabaseConfig.client;
 
   Future<List<Listing>> getAll() async {
@@ -14,6 +12,7 @@ class ListingsService {
         .from('listings')
         .select()
         .order('created_at', ascending: false);
+
     return (res as List)
         .map((m) => Listing.fromMap(m as Map<String, dynamic>))
         .toList();
@@ -23,29 +22,31 @@ class ListingsService {
     required String title,
     required String description,
     required double price,
-    required String status, // 'adoption' | 'sale' | 'rescue'
     String? imageUrl,
   }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw Exception('No hay usuario');
+
     await _client.from('listings').insert({
       'title': title,
       'description': description,
       'price': price,
-      'status': status,
+      'status': 'Sale', // <-- ÚNICO VALOR PERMITIDO PARA "Venta"
       'image_url': imageUrl,
+      'author': user.id, // <-- RLS requiere esto
     });
   }
 
-  Future<void> delete(int id) async {
+  Future<void> delete(String id) async {
     await _client.from('listings').delete().eq('id', id);
   }
 
-  /// Sube bytes y devuelve URL pública. Prueba varios buckets para
-  /// evitar el problema de que no te deje crear 'public'.
   Future<String?> uploadImageBytes({
     required Uint8List bytes,
     required String filename,
   }) async {
     final path = 'marketplace/$filename';
+
     for (final bucket in _candidatesBuckets) {
       try {
         await _client.storage
@@ -58,11 +59,11 @@ class ListingsService {
                 contentType: 'image/*',
               ),
             );
+
         return _client.storage.from(bucket).getPublicUrl(path);
-      } catch (_) {
-        // probamos el siguiente bucket
-      }
+      } catch (_) {}
     }
+
     return null;
   }
 }
