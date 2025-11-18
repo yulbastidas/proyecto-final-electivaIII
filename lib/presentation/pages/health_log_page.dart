@@ -19,15 +19,14 @@ class HealthLogPage extends StatefulWidget {
 }
 
 class _HealthLogPageState extends State<HealthLogPage> {
-  // PESO
   final _formWeightKey = GlobalKey<FormState>();
   final _weightCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
 
-  // EVENTO
   final _formEventKey = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
   final _detailsCtrl = TextEditingController();
+
   HealthType _selectedType = HealthType.vaccine;
   DateTime? _selectedDate;
 
@@ -46,13 +45,11 @@ class _HealthLogPageState extends State<HealthLogPage> {
     super.dispose();
   }
 
-  // -------- PESO --------
-  Future<void> _onSaveWeight() async {
+  Future<void> _saveWeight() async {
     if (!_formWeightKey.currentState!.validate()) return;
 
     final text = _weightCtrl.text.trim().replaceAll(',', '.');
     final valueKg = double.tryParse(text);
-
     if (valueKg == null) {
       ScaffoldMessenger.of(
         context,
@@ -69,13 +66,13 @@ class _HealthLogPageState extends State<HealthLogPage> {
     if (!mounted) return;
     _weightCtrl.clear();
     _noteCtrl.clear();
+
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Peso guardado')));
   }
 
-  // -------- EVENTO --------
-  Future<void> _onSaveEvent() async {
+  Future<void> _saveEvent() async {
     if (!_formEventKey.currentState!.validate()) return;
 
     await widget.controller.addEvent(
@@ -89,6 +86,7 @@ class _HealthLogPageState extends State<HealthLogPage> {
     );
 
     if (!mounted) return;
+
     _titleCtrl.clear();
     _detailsCtrl.clear();
     _selectedType = HealthType.vaccine;
@@ -97,10 +95,10 @@ class _HealthLogPageState extends State<HealthLogPage> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Evento de salud guardado')));
+
     setState(() {});
   }
 
-  // ---------- SOLO 3 TIPOS PERMITIDOS ----------
   String _typeLabel(HealthType t) {
     switch (t) {
       case HealthType.vaccine:
@@ -144,60 +142,9 @@ class _HealthLogPageState extends State<HealthLogPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // ---------- FORM PESO ----------
-                Card(
-                  elevation: 0,
-                  color: const Color(0xFFF5EAF5),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Form(
-                      key: _formWeightKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const Text(
-                            'Agregar peso',
-                            style: TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _weightCtrl,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            decoration: const InputDecoration(
-                              labelText: 'Peso (kg)',
-                            ),
-                            validator: (v) {
-                              final t = (v ?? '').trim().replaceAll(',', '.');
-                              final d = double.tryParse(t);
-                              if (d == null) return 'Ingresa un número';
-                              if (d <= 0) return 'Debe ser mayor que 0';
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _noteCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Nota (opcional)',
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: ElevatedButton(
-                              onPressed: _onSaveWeight,
-                              child: const Text('Guardar'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
+                _buildWeightForm(),
                 const SizedBox(height: 24),
+
                 const Divider(),
                 const SizedBox(height: 8),
                 const Text(
@@ -222,110 +169,9 @@ class _HealthLogPageState extends State<HealthLogPage> {
                 const Divider(),
                 const SizedBox(height: 8),
 
-                // ---------- FORM EVENTO ----------
-                Card(
-                  elevation: 0,
-                  color: const Color(0xFFE8F4FF),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Form(
-                      key: _formEventKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const Text(
-                            'Agregar evento de salud',
-                            style: TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 12),
-
-                          // *** SOLO 3 TIPOS ***
-                          DropdownButtonFormField<HealthType>(
-                            value: _selectedType,
-                            decoration: const InputDecoration(
-                              labelText: 'Tipo',
-                            ),
-                            items: HealthType.values
-                                .map(
-                                  (t) => DropdownMenuItem(
-                                    value: t,
-                                    child: Text(_typeLabel(t)),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (t) {
-                              if (t == null) return;
-                              setState(() => _selectedType = t);
-                            },
-                          ),
-                          const SizedBox(height: 12),
-
-                          TextFormField(
-                            controller: _titleCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Título (ej: Vacuna rabia)',
-                            ),
-                            validator: (v) {
-                              if ((v ?? '').trim().isEmpty) {
-                                return 'Campo obligatorio';
-                              }
-                              return null;
-                            },
-                          ),
-
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  _selectedDate == null
-                                      ? 'Fecha: hoy'
-                                      : 'Fecha: ${_selectedDate!.toLocal().toString().split(' ').first}',
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: () async {
-                                  final now = DateTime.now();
-                                  final picked = await showDatePicker(
-                                    context: context,
-                                    firstDate: DateTime(now.year - 5),
-                                    lastDate: DateTime(now.year + 1),
-                                    initialDate: now,
-                                  );
-                                  if (picked != null) {
-                                    setState(() {
-                                      _selectedDate = picked;
-                                    });
-                                  }
-                                },
-                                child: const Text('Cambiar fecha'),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _detailsCtrl,
-                            maxLines: 3,
-                            decoration: const InputDecoration(
-                              labelText: 'Detalles (opcional)',
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: ElevatedButton(
-                              onPressed: _onSaveEvent,
-                              child: const Text('Guardar evento'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
+                _buildEventForm(),
                 const SizedBox(height: 24),
+
                 const Text(
                   'Historial de eventos de salud',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -350,6 +196,148 @@ class _HealthLogPageState extends State<HealthLogPage> {
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWeightForm() {
+    return Card(
+      color: const Color(0xFFF5EAF5),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formWeightKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Agregar peso',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _weightCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(labelText: 'Peso (kg)'),
+                validator: (v) {
+                  final t = (v ?? '').trim().replaceAll(',', '.');
+                  final d = double.tryParse(t);
+                  if (d == null) return 'Ingresa un número';
+                  if (d <= 0) return 'Debe ser mayor que 0';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _noteCtrl,
+                decoration: const InputDecoration(labelText: 'Nota (opcional)'),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: ElevatedButton(
+                  onPressed: _saveWeight,
+                  child: const Text('Guardar'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEventForm() {
+    return Card(
+      color: const Color(0xFFE8F4FF),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formEventKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Agregar evento de salud',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<HealthType>(
+                value: _selectedType,
+                decoration: const InputDecoration(labelText: 'Tipo'),
+                items: HealthType.values
+                    .map(
+                      (t) => DropdownMenuItem(
+                        value: t,
+                        child: Text(_typeLabel(t)),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (t) {
+                  if (t == null) return;
+                  setState(() => _selectedType = t);
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _titleCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Título (ej: Vacuna rabia)',
+                ),
+                validator: (v) {
+                  if ((v ?? '').trim().isEmpty) {
+                    return 'Campo obligatorio';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _selectedDate == null
+                          ? 'Fecha: hoy'
+                          : 'Fecha: ${_selectedDate!.toLocal().toString().split(' ').first}',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      final now = DateTime.now();
+                      final picked = await showDatePicker(
+                        context: context,
+                        firstDate: DateTime(now.year - 5),
+                        lastDate: DateTime(now.year + 1),
+                        initialDate: now,
+                      );
+                      if (picked != null) {
+                        setState(() => _selectedDate = picked);
+                      }
+                    },
+                    child: const Text('Cambiar fecha'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _detailsCtrl,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'Detalles'),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: ElevatedButton(
+                  onPressed: _saveEvent,
+                  child: const Text('Guardar evento'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

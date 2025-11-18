@@ -9,6 +9,8 @@ class ListingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
@@ -29,15 +31,9 @@ class ListingCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  listing.title,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                Text(listing.title, style: textTheme.titleMedium),
                 const SizedBox(height: 4),
-                Text(
-                  listing.description,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
+                Text(listing.description, style: textTheme.bodyMedium),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 12,
@@ -55,12 +51,11 @@ class ListingCard extends StatelessWidget {
                   children: [
                     Text(
                       'Publicado: ${listing.createdAt}',
-                      style: Theme.of(context).textTheme.labelSmall,
+                      style: textTheme.labelSmall,
                     ),
                     const Spacer(),
                     if (onDelete != null)
                       IconButton(
-                        tooltip: 'Eliminar',
                         icon: const Icon(Icons.delete_outline),
                         onPressed: onDelete,
                       ),

@@ -10,6 +10,8 @@ class PostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).textTheme;
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: Padding(
@@ -23,7 +25,7 @@ class PostCard extends StatelessWidget {
                 child: Image.network(post.mediaUrl!, fit: BoxFit.cover),
               ),
             const SizedBox(height: 8),
-            Text(post.status, style: Theme.of(context).textTheme.titleMedium),
+            Text(post.status, style: theme.titleMedium),
             if ((post.content ?? '').isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(post.content!),
@@ -34,14 +36,12 @@ class PostCard extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.favorite_border),
                   onPressed: () => onLike?.call(post.id),
-                  tooltip: 'Me gusta',
                 ),
                 Text('${post.likes}'),
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.delete_outline),
                   onPressed: () => onDelete?.call(post.id),
-                  tooltip: 'Eliminar',
                 ),
               ],
             ),

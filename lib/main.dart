@@ -1,11 +1,12 @@
 // lib/main.dart
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // ✅ AGREGADO
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'core/config/supabase_config.dart';
 import 'presentation/pages/auth_page.dart';
@@ -14,13 +15,9 @@ import 'presentation/pages/home_page.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1️⃣ Cargar variables de entorno (.env)
-  await dotenv.load(fileName: ".env"); // ✅ AGREGADO
-
-  // 2️⃣ Inicializar Supabase
+  await dotenv.load(fileName: ".env");
   await SupabaseConfig.init();
 
-  // 3️⃣ Localización (fechas en español)
   await initializeDateFormatting('es_CO');
   Intl.defaultLocale = 'es_CO';
 
@@ -48,36 +45,38 @@ class App extends StatelessWidget {
   }
 }
 
-/// Escucha cambios de auth y alterna entre Login y Home.
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
+
   @override
   State<AuthGate> createState() => _AuthGateState();
 }
 
 class _AuthGateState extends State<AuthGate> {
   Session? _session;
-  StreamSubscription<AuthState>? _sub;
+  StreamSubscription<AuthState>? _authSub;
 
   @override
   void initState() {
     super.initState();
     final auth = Supabase.instance.client.auth;
+
     _session = auth.currentSession;
-    _sub = auth.onAuthStateChange.listen((event) {
+
+    _authSub = auth.onAuthStateChange.listen((event) {
       setState(() => _session = event.session);
     });
   }
 
   @override
   void dispose() {
-    _sub?.cancel();
+    _authSub?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_session == null) return const AuthPage(); // Login/Registro
-    return const HomePage(); // Navegación (feed, mapa, etc.)
+    if (_session == null) return const AuthPage();
+    return const HomePage();
   }
 }

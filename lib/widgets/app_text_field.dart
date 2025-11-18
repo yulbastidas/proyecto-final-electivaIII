@@ -20,11 +20,10 @@ class AppTextField extends StatelessWidget {
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
+      decoration: const InputDecoration(
+        border: OutlineInputBorder(),
         isDense: true,
-      ),
+      ).copyWith(labelText: label),
     );
   }
 }

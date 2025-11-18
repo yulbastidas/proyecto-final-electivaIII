@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+
 import 'package:pets/data/models/listing.dart';
 import 'package:pets/data/services/listings_service.dart';
 import 'package:pets/widgets/listing_card.dart';
@@ -9,6 +10,7 @@ import 'package:pets/widgets/primary_button.dart';
 
 class MarketplacePage extends StatefulWidget {
   const MarketplacePage({super.key});
+
   @override
   State<MarketplacePage> createState() => _MarketplacePageState();
 }
@@ -18,6 +20,12 @@ class _MarketplacePageState extends State<MarketplacePage> {
 
   bool _loading = true;
   List<Listing> _items = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   Future<void> _load() async {
     setState(() => _loading = true);
@@ -52,12 +60,6 @@ class _MarketplacePageState extends State<MarketplacePage> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: _loading
@@ -72,7 +74,10 @@ class _MarketplacePageState extends State<MarketplacePage> {
                   for (final it in _items)
                     ListingCard(
                       listing: it,
-                      onDelete: () => _svc.delete(it.id).then((_) => _load()),
+                      onDelete: () async {
+                        await _svc.delete(it.id);
+                        await _load();
+                      },
                     ),
                 ],
               ),
@@ -98,9 +103,9 @@ class _Composer extends StatefulWidget {
 }
 
 class _ComposerState extends State<_Composer> {
-  final _title = TextEditingController();
-  final _desc = TextEditingController();
-  final _price = TextEditingController();
+  final _titleCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  final _priceCtrl = TextEditingController();
 
   Uint8List? _bytes;
   String? _filename;
@@ -119,27 +124,29 @@ class _ComposerState extends State<_Composer> {
   }
 
   Future<void> _submit() async {
-    final p = double.tryParse(_price.text.trim()) ?? 0;
+    final price = double.tryParse(_priceCtrl.text.trim()) ?? 0;
+    final title = _titleCtrl.text.trim();
+    final desc = _descCtrl.text.trim();
 
-    if (_title.text.trim().isEmpty || _desc.text.trim().isEmpty) return;
+    if (title.isEmpty || desc.isEmpty) return;
 
     if (!mounted) return;
     setState(() => _submitting = true);
 
     try {
       await widget.onCreate(
-        title: _title.text.trim(),
-        description: _desc.text.trim(),
-        price: p,
+        title: title,
+        description: desc,
+        price: price,
         imageBytes: _bytes,
         filename: _filename,
       );
     } finally {
       if (!mounted) return;
 
-      _title.clear();
-      _desc.clear();
-      _price.clear();
+      _titleCtrl.clear();
+      _descCtrl.clear();
+      _priceCtrl.clear();
       _bytes = null;
       _filename = null;
       _submitting = false;
@@ -149,10 +156,20 @@ class _ComposerState extends State<_Composer> {
   }
 
   @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _descCtrl.dispose();
+    _priceCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Card(
       elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(.4),
+      color: theme.colorScheme.surfaceVariant.withOpacity(.4),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -160,12 +177,12 @@ class _ComposerState extends State<_Composer> {
             Row(
               children: [
                 Expanded(
-                  child: AppTextField(controller: _title, label: 'Título'),
+                  child: AppTextField(controller: _titleCtrl, label: 'Título'),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: AppTextField(
-                    controller: _price,
+                    controller: _priceCtrl,
                     label: 'Precio',
                     keyboardType: TextInputType.number,
                   ),
@@ -174,7 +191,11 @@ class _ComposerState extends State<_Composer> {
             ),
 
             const SizedBox(height: 8),
-            AppTextField(controller: _desc, label: 'Descripción', maxLines: 3),
+            AppTextField(
+              controller: _descCtrl,
+              label: 'Descripción',
+              maxLines: 3,
+            ),
 
             const SizedBox(height: 8),
             const Align(

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
+
 import '../../data/services/location_service.dart';
 import '../../data/services/vet_places_service.dart';
 import '../../data/services/routing_service.dart';
@@ -23,16 +24,17 @@ class MapController extends ChangeNotifier {
 
   LatLng cityCenter = kPastoCenter;
   LatLng? userLocation;
+
   bool isLoading = false;
 
   List<VetPlace> veterinaries = [];
   VetPlace? selectedVet;
+
   List<LatLng> routePath = [];
   double? distanceKm;
   int? durationMin;
   String routeMode = 'driving';
 
-  /// Carga veterinarias y ubicación del usuario.
   Future<void> initialize() async {
     isLoading = true;
     notifyListeners();
@@ -51,13 +53,10 @@ class MapController extends ChangeNotifier {
   }
 
   Future<void> _loadUserLocation() async {
-    final position = await _locationSvc.getCurrentPosition();
-    userLocation = position != null
-        ? LatLng(position.latitude, position.longitude)
-        : null;
+    final pos = await _locationSvc.getCurrentPosition();
+    userLocation = pos != null ? LatLng(pos.latitude, pos.longitude) : null;
   }
 
-  /// Calcula y dibuja la ruta hacia una veterinaria.
   Future<void> navigateToVet(VetPlace vet) async {
     final origin = userLocation ?? cityCenter;
 
@@ -87,7 +86,6 @@ class MapController extends ChangeNotifier {
     }
   }
 
-  /// Limpia la ruta actual.
   void clearRoute() {
     routePath = [];
     selectedVet = null;
@@ -96,7 +94,6 @@ class MapController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Cambia el modo de transporte y recalcula la ruta.
   Future<void> changeRouteMode(String mode) async {
     if (mode == routeMode) return;
 

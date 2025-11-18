@@ -4,6 +4,15 @@ import 'package:pets/widgets/app_text_field.dart';
 import 'package:pets/widgets/primary_button.dart';
 
 class PostComposer extends StatelessWidget {
+  final TextEditingController textCtrl;
+  final String status;
+  final ValueChanged<String> onChangeStatus;
+  final Uint8List? imageBytes;
+  final VoidCallback onPickImage;
+  final VoidCallback onRemoveImage;
+  final VoidCallback? onPublish;
+  final bool publishing;
+
   const PostComposer({
     super.key,
     required this.textCtrl,
@@ -16,19 +25,10 @@ class PostComposer extends StatelessWidget {
     required this.publishing,
   });
 
-  final TextEditingController textCtrl;
-  final String status;
-  final ValueChanged<String> onChangeStatus;
-
-  final Uint8List? imageBytes;
-  final VoidCallback onPickImage;
-  final VoidCallback onRemoveImage;
-
-  final VoidCallback? onPublish;
-  final bool publishing;
-
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Card(
       elevation: 0.5,
       child: Padding(
@@ -74,13 +74,11 @@ class PostComposer extends StatelessWidget {
                 IconButton.filledTonal(
                   onPressed: onPickImage,
                   icon: const Icon(Icons.photo),
-                  tooltip: 'Elegir imagen',
                 ),
                 if (imageBytes != null)
                   IconButton(
                     onPressed: onRemoveImage,
                     icon: const Icon(Icons.close),
-                    tooltip: 'Quitar imagen',
                   ),
               ],
             ),
@@ -92,7 +90,7 @@ class PostComposer extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                   child: Image.memory(
                     imageBytes!,
-                    fit: BoxFit.cover, // estilo DALL·E
+                    fit: BoxFit.cover,
                     filterQuality: FilterQuality.medium,
                   ),
                 ),

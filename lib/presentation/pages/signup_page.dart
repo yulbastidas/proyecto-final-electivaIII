@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../data/services/auth_service.dart';
 
 class SignUpPage extends StatefulWidget {
@@ -10,27 +11,42 @@ class SignUpPage extends StatefulWidget {
 }
 
 class _SignUpPageState extends State<SignUpPage> {
-  final _email = TextEditingController();
-  final _password = TextEditingController();
-  final _username = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _usernameCtrl = TextEditingController();
+
   bool _loading = false;
 
   Future<void> _signUp() async {
+    final email = _emailCtrl.text.trim();
+    final password = _passwordCtrl.text.trim();
+    final username = _usernameCtrl.text.trim().isEmpty
+        ? null
+        : _usernameCtrl.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Todos los campos obligatorios')),
+      );
+      return;
+    }
+
     setState(() => _loading = true);
+
     try {
       final client = Supabase.instance.client;
       final auth = AuthService(client);
 
       final res = await auth.signUp(
-        email: _email.text.trim(),
-        password: _password.text,
-        username: _username.text.trim().isEmpty ? null : _username.text.trim(),
+        email: email,
+        password: password,
+        username: username,
       );
 
       if (!mounted) return;
 
       if (res.session != null) {
-        // Vuelve al root para que tu AuthGate mande a HomePage (con todas las pestañas)
         Navigator.pushNamedAndRemoveUntil(context, '/', (_) => false);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -62,9 +78,9 @@ class _SignUpPageState extends State<SignUpPage> {
 
   @override
   void dispose() {
-    _email.dispose();
-    _password.dispose();
-    _username.dispose();
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    _usernameCtrl.dispose();
     super.dispose();
   }
 
@@ -77,20 +93,20 @@ class _SignUpPageState extends State<SignUpPage> {
         child: Column(
           children: [
             TextField(
-              controller: _username,
+              controller: _usernameCtrl,
               decoration: const InputDecoration(
                 labelText: 'Username (opcional)',
               ),
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: _email,
+              controller: _emailCtrl,
               decoration: const InputDecoration(labelText: 'Email'),
               keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: _password,
+              controller: _passwordCtrl,
               decoration: const InputDecoration(labelText: 'Password'),
               obscureText: true,
             ),

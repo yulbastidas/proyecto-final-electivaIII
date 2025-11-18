@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' as fmap;
 import 'package:latlong2/latlong.dart';
+
 import '../controller/map_controller.dart';
 import '../../widgets/map_bottom_panel.dart';
 import '../../data/models/vet_place.dart';
@@ -14,7 +15,7 @@ class MapPage extends StatefulWidget {
 
 class _MapPageState extends State<MapPage> {
   late final MapController _controller;
-  final fmap.MapController _mapController = fmap.MapController();
+  final fmap.MapController _mapCtrl = fmap.MapController();
 
   @override
   void initState() {
@@ -44,15 +45,12 @@ class _MapPageState extends State<MapPage> {
       ),
       body: ListenableBuilder(
         listenable: _controller,
-        builder: (context, _) {
+        builder: (_, __) {
           return Stack(
             children: [
-              _MapView(controller: _controller, mapController: _mapController),
+              _MapView(controller: _controller, mapController: _mapCtrl),
               if (_controller.isLoading) const _LoadingOverlay(),
-              MapBottomPanel(
-                controller: _controller,
-                mapController: _mapController,
-              ),
+              MapBottomPanel(controller: _controller, mapController: _mapCtrl),
             ],
           );
         },
@@ -86,6 +84,7 @@ class _MapView extends StatelessWidget {
           minZoom: 3,
           maxZoom: 19,
         ),
+
         if (controller.routePath.isNotEmpty)
           fmap.PolylineLayer(
             polylines: [
@@ -98,6 +97,7 @@ class _MapView extends StatelessWidget {
               ),
             ],
           ),
+
         fmap.MarkerLayer(
           markers: [..._buildUserMarker(), ..._buildVetMarkers(context)],
         ),
@@ -106,11 +106,12 @@ class _MapView extends StatelessWidget {
   }
 
   List<fmap.Marker> _buildUserMarker() {
-    if (controller.userLocation == null) return const [];
+    final loc = controller.userLocation;
+    if (loc == null) return const [];
 
     return [
       fmap.Marker(
-        point: controller.userLocation!,
+        point: loc,
         width: 40,
         height: 40,
         child: Container(

@@ -30,7 +30,6 @@ class _HomePageState extends State<HomePage> {
 
   late final HealthController _healthCtrl;
   late final ChatController _chatCtrl;
-
   late final String _petId;
 
   @override
@@ -44,16 +43,12 @@ class _HomePageState extends State<HomePage> {
       throw Exception("No hay sesión activa.");
     }
 
-    // En tu sistema, _petId = uid
     _petId = uid;
 
-    // -------- HEALTH ----------
     _healthCtrl = HealthController(
       HealthRepositoryImpl(sb, () => sb.auth.currentUser!.id),
     );
 
-    // -------- CHAT ----------
-    // Tu ChatRepositoryImpl SOLO recibe (sb, getUid)
     final chatRepo = ChatRepositoryImpl(
       sb: sb,
       getUid: () => sb.auth.currentUser!.id,
@@ -64,7 +59,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = <Widget>[
+    final pages = [
       const FeedPage(),
       const MapPage(),
       HealthLogPage(petId: _petId, controller: _healthCtrl),

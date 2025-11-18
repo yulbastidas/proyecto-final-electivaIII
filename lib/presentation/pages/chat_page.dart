@@ -32,9 +32,7 @@ class _ChatPageState extends State<ChatPage> {
           IconButton(
             icon: const Icon(Icons.add_comment_outlined),
             tooltip: "Nueva sesión",
-            onPressed: () async {
-              await ctrl.createNewSession(widget.petId);
-            },
+            onPressed: () => ctrl.createNewSession(widget.petId),
           ),
         ],
       ),
@@ -51,48 +49,7 @@ class _ChatPageState extends State<ChatPage> {
 
           return Row(
             children: [
-              // -------------------- SIDEBAR: SESIONES --------------------
-              Container(
-                width: 250,
-                color: Colors.grey.shade200,
-                child: Column(
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: Text(
-                        "Sesiones",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView(
-                        children: ctrl.sessions.map((s) {
-                          final isSelected = ctrl.currentSession?.id == s.id;
-
-                          return ListTile(
-                            title: Text(
-                              s.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            selected: isSelected,
-                            onTap: () => ctrl.loadSession(s.id),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete_outline),
-                              onPressed: () => ctrl.deleteSession(s.id),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // -------------------- CHAT AREA --------------------
+              _buildSidebar(ctrl),
               Expanded(
                 child: Column(
                   children: [
@@ -106,7 +63,7 @@ class _ChatPageState extends State<ChatPage> {
                             )
                           : _buildMessages(ctrl),
                     ),
-                    if (ctrl.currentSession != null) _buildInputBar(ctrl),
+                    if (ctrl.currentSession != null) _buildInput(ctrl),
                   ],
                 ),
               ),
@@ -117,19 +74,59 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  // -------------------- MENSAJES --------------------
+  // ---------------- Sidebar ----------------
+  Widget _buildSidebar(ChatController ctrl) {
+    return Container(
+      width: 250,
+      color: Colors.grey.shade200,
+      child: Column(
+        children: [
+          const Padding(
+            padding: EdgeInsets.all(12),
+            child: Text(
+              "Sesiones",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              children: ctrl.sessions.map((s) {
+                final selected = ctrl.currentSession?.id == s.id;
+
+                return ListTile(
+                  title: Text(
+                    s.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  selected: selected,
+                  onTap: () => ctrl.loadSession(s.id),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () => ctrl.deleteSession(s.id),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------- Mensajes ----------------
   Widget _buildMessages(ChatController ctrl) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         ...ctrl.messages.map(_buildBubble),
-        if (ctrl.isTyping) _typingIndicator(),
+        if (ctrl.isTyping) _typing(),
       ],
     );
   }
 
   Widget _buildBubble(MessageEntity msg) {
-    final bool isUser = msg.role == 'user';
+    final isUser = msg.role == 'user';
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -149,7 +146,7 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  Widget _typingIndicator() {
+  Widget _typing() {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
@@ -167,8 +164,8 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  // -------------------- INPUT --------------------
-  Widget _buildInputBar(ChatController ctrl) {
+  // ---------------- Input ----------------
+  Widget _buildInput(ChatController ctrl) {
     return Container(
       padding: const EdgeInsets.all(10),
       color: Colors.grey.shade100,

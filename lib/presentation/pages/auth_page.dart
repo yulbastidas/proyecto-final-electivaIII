@@ -57,22 +57,19 @@ class _AuthPageState extends State<AuthPage> {
               : _username.text.trim(),
         );
       }
-      // No navegamos manualmente; un AuthGate/Listener debe reaccionar a la sesión.
     } on AuthException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _error = e.message);
     } catch (_) {
-      if (!mounted) return;
-      setState(() => _error = 'Ocurrió un error. Intenta de nuevo.');
+      if (mounted) setState(() => _error = 'Ocurrió un error.');
     } finally {
-      if (!mounted) return;
-      setState(() => _busy = false);
+      if (mounted) setState(() => _busy = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     return Scaffold(
       backgroundColor: theme.colorScheme.surface.withOpacity(0.06),
       body: Center(
@@ -95,6 +92,7 @@ class _AuthPageState extends State<AuthPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
+
                   if (_error != null)
                     Container(
                       width: double.infinity,
@@ -111,6 +109,7 @@ class _AuthPageState extends State<AuthPage> {
                         ),
                       ),
                     ),
+
                   if (!_isLogin) ...[
                     TextField(
                       controller: _username,
@@ -129,15 +128,17 @@ class _AuthPageState extends State<AuthPage> {
                     ),
                     const SizedBox(height: 8),
                   ],
+
                   TextField(
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(
-                      labelText: 'Email',
+                      labelText: 'Correo',
                       prefixIcon: Icon(Icons.email),
                     ),
                   ),
                   const SizedBox(height: 8),
+
                   TextField(
                     controller: _password,
                     obscureText: true,
@@ -147,6 +148,7 @@ class _AuthPageState extends State<AuthPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
+
                   FilledButton(
                     onPressed: _busy ? null : _submit,
                     child: _busy
@@ -157,6 +159,7 @@ class _AuthPageState extends State<AuthPage> {
                           )
                         : Text(_isLogin ? 'Iniciar sesión' : 'Registrarme'),
                   ),
+
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: _busy

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' as fmap;
 import 'package:latlong2/latlong.dart';
+
 import '../presentation/controller/map_controller.dart';
 import '../data/models/vet_place.dart';
 
@@ -24,7 +25,7 @@ class MapBottomPanel extends StatelessWidget {
           initialChildSize: 0.22,
           minChildSize: 0.18,
           maxChildSize: 0.64,
-          builder: (context, scrollController) {
+          builder: (_, scrollController) {
             return _BottomSheetContent(
               controller: controller,
               mapController: mapController,
@@ -112,20 +113,17 @@ class _ControlsRow extends StatelessWidget {
               ButtonSegment(value: 'walking', label: Text('Segura')),
             ],
             selected: {controller.routeMode},
-            onSelectionChanged: (selection) =>
-                controller.changeRouteMode(selection.first),
+            onSelectionChanged: (s) => controller.changeRouteMode(s.first),
           ),
         ),
         const SizedBox(width: 8),
         IconButton.filledTonal(
-          tooltip: 'Centrar Pasto',
           onPressed: () => mapController.move(MapController.kPastoCenter, 14),
           icon: const Icon(Icons.center_focus_strong),
         ),
         const SizedBox(width: 6),
         if (controller.userLocation != null)
           IconButton.filled(
-            tooltip: 'Mi ubicación',
             onPressed: () => mapController.move(controller.userLocation!, 15),
             icon: const Icon(Icons.my_location),
           ),
@@ -168,7 +166,8 @@ class _RouteInfoCard extends StatelessWidget {
                 ),
                 if (controller.distanceKm != null)
                   Text(
-                    '${controller.distanceKm!.toStringAsFixed(2)} km • ${controller.durationMin} min',
+                    '${controller.distanceKm!.toStringAsFixed(2)} km • '
+                    '${controller.durationMin} min',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onPrimaryContainer,
                     ),
@@ -177,9 +176,8 @@ class _RouteInfoCard extends StatelessWidget {
             ),
           ),
           IconButton.filledTonal(
-            tooltip: 'Limpiar ruta',
-            onPressed: controller.clearRoute,
             icon: const Icon(Icons.close, size: 20),
+            onPressed: controller.clearRoute,
           ),
         ],
       ),
@@ -224,10 +222,9 @@ class _VeterinaryList extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       itemCount: controller.veterinaries.length,
       separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        final vet = controller.veterinaries[index];
+      itemBuilder: (_, index) {
         return _VeterinaryTile(
-          vet: vet,
+          vet: controller.veterinaries[index],
           controller: controller,
           mapController: mapController,
         );
@@ -263,14 +260,14 @@ class _VeterinaryTile extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
       trailing: FilledButton(
-        onPressed: () => _navigateToVet(context),
+        onPressed: () => _navigate(context),
         child: const Text('Ir'),
       ),
       onTap: () => mapController.move(LatLng(vet.lat, vet.lon), 16),
     );
   }
 
-  Future<void> _navigateToVet(BuildContext context) async {
+  Future<void> _navigate(BuildContext context) async {
     await controller.navigateToVet(vet);
 
     if (controller.routePath.isNotEmpty) {

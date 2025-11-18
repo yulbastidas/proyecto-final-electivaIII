@@ -16,24 +16,24 @@ class PostItem extends StatelessWidget {
   });
 
   Future<String?> _showCommentDialog(BuildContext context) async {
-    final ctrl = TextEditingController();
+    final controller = TextEditingController();
 
     return showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text("Agregar comentario"),
         content: TextField(
-          controller: ctrl,
+          controller: controller,
           decoration: const InputDecoration(labelText: "Escribe tu comentario"),
         ),
         actions: [
           TextButton(
-            child: const Text("Cancelar"),
             onPressed: () => Navigator.pop(context),
+            child: const Text("Cancelar"),
           ),
           FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
             child: const Text("Enviar"),
-            onPressed: () => Navigator.pop(context, ctrl.text),
           ),
         ],
       ),
@@ -42,6 +42,8 @@ class PostItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasContent = (post.content ?? '').isNotEmpty;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -61,7 +63,7 @@ class PostItem extends StatelessWidget {
               ),
             const SizedBox(height: 8),
             Text(post.status, style: const TextStyle(fontSize: 16)),
-            if (post.content != null)
+            if (hasContent)
               Text(post.content!, style: const TextStyle(fontSize: 14)),
             const SizedBox(height: 8),
             Row(
@@ -70,7 +72,7 @@ class PostItem extends StatelessWidget {
                   icon: const Icon(Icons.favorite_outline),
                   onPressed: onLike,
                 ),
-                Text("${post.likes}"),
+                Text('${post.likes}'),
                 IconButton(
                   icon: const Icon(Icons.comment),
                   onPressed: () async {

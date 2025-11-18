@@ -1,4 +1,3 @@
-// lib/widgets/auth/auth_form.dart
 import 'package:flutter/material.dart';
 
 class AuthFormData {
@@ -6,6 +5,7 @@ class AuthFormData {
   final String email;
   final String password;
   final String username;
+
   const AuthFormData({
     required this.isLogin,
     required this.email,
@@ -16,6 +16,7 @@ class AuthFormData {
 
 class AuthForm extends StatefulWidget {
   final Future<void> Function(AuthFormData data) onSubmit;
+
   const AuthForm({super.key, required this.onSubmit});
 
   @override
@@ -24,6 +25,7 @@ class AuthForm extends StatefulWidget {
 
 class _AuthFormState extends State<AuthForm> {
   final _formKey = GlobalKey<FormState>();
+
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _usernameCtrl = TextEditingController();
@@ -42,6 +44,7 @@ class _AuthFormState extends State<AuthForm> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
     FocusScope.of(context).unfocus();
     setState(() => _loading = true);
 
@@ -53,12 +56,16 @@ class _AuthFormState extends State<AuthForm> {
     );
 
     await widget.onSubmit(data);
-    if (mounted) setState(() => _loading = false);
+
+    if (mounted) {
+      setState(() => _loading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
+
     return Form(
       key: _formKey,
       child: Column(
@@ -70,7 +77,7 @@ class _AuthFormState extends State<AuthForm> {
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
-                color: color.onSurface,
+                color: colors.onSurface,
               ),
             ),
           ),
@@ -154,7 +161,7 @@ class _AuthFormState extends State<AuthForm> {
             children: [
               Text(
                 _isLogin ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?',
-                style: TextStyle(color: color.onSurfaceVariant),
+                style: TextStyle(color: colors.onSurfaceVariant),
               ),
               TextButton(
                 onPressed: _loading

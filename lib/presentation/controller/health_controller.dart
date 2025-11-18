@@ -20,10 +20,9 @@ class HealthController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ---------- PESOS ----------
   Future<void> addWeight({
     required String petId,
-    required double valueKg, // ✔ usa valueKg correcto
+    required double valueKg,
     String? note,
   }) async {
     await repo.addWeight(petId: petId, valueKg: valueKg, note: note);
@@ -35,17 +34,16 @@ class HealthController extends ChangeNotifier {
     await load(petId);
   }
 
-  // ---------- EVENTOS ----------
   Future<void> addEvent({
     required String petId,
-    required HealthType type, // ✔ usa HealthType correcto
+    required HealthType type,
     required String title,
     DateTime? happenedAt,
     String? details,
   }) async {
     await repo.addEvent(
       petId: petId,
-      type: type, // ✔ esto se convierte a 'vaccine'/'deworm'/'med'
+      type: type,
       title: title,
       happenedAt: happenedAt,
       details: details,

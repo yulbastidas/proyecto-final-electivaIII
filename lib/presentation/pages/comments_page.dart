@@ -11,10 +11,10 @@ class CommentsPage extends StatefulWidget {
 
 class _CommentsPageState extends State<CommentsPage> {
   final client = Supabase.instance.client;
-  final text = TextEditingController();
+  final textCtrl = TextEditingController();
 
-  Future<List<Map<String, dynamic>>> _fetch() async {
-    return await client
+  Future<List<Map<String, dynamic>>> _load() async {
+    return client
         .from('feed_comments')
         .select()
         .eq('post_id', widget.postId)
@@ -24,20 +24,33 @@ class _CommentsPageState extends State<CommentsPage> {
   Future<void> _send() async {
     final uid = client.auth.currentUser?.id;
     if (uid == null) return;
+
+    final msg = textCtrl.text.trim();
+    if (msg.isEmpty) return;
+
     await client.from('feed_comments').insert({
       'post_id': widget.postId,
       'author': uid,
-      'text': text.text.trim(),
+      'text': msg,
     });
-    text.clear();
+
+    textCtrl.clear();
     setState(() {});
   }
 
   Future<void> _delete(int id) async {
     final uid = client.auth.currentUser?.id;
     if (uid == null) return;
+
     await client.from('feed_comments').delete().eq('id', id).eq('author', uid);
+
     setState(() {});
+  }
+
+  @override
+  void dispose() {
+    textCtrl.dispose();
+    super.dispose();
   }
 
   @override
@@ -48,22 +61,26 @@ class _CommentsPageState extends State<CommentsPage> {
         children: [
           Expanded(
             child: FutureBuilder(
-              future: _fetch(),
+              future: _load(),
               builder: (context, snap) {
-                if (!snap.hasData)
+                if (!snap.hasData) {
                   return const Center(child: CircularProgressIndicator());
+                }
+
                 final list = snap.data as List<Map<String, dynamic>>;
+
                 return ListView.builder(
                   padding: const EdgeInsets.all(12),
                   itemCount: list.length,
                   itemBuilder: (_, i) {
                     final c = list[i];
+
                     return ListTile(
                       title: Text(c['text'] ?? ''),
                       subtitle: Text((c['created_at'] ?? '').toString()),
                       trailing: IconButton(
                         icon: const Icon(Icons.delete_outline),
-                        onPressed: () => _delete(c['id'] as int),
+                        onPressed: () => _delete(c['id']),
                       ),
                     );
                   },
@@ -77,7 +94,7 @@ class _CommentsPageState extends State<CommentsPage> {
               children: [
                 Expanded(
                   child: TextField(
-                    controller: text,
+                    controller: textCtrl,
                     decoration: const InputDecoration(hintText: 'Escribe...'),
                   ),
                 ),
