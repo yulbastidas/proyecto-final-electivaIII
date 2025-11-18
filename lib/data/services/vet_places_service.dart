@@ -16,20 +16,17 @@ class VetPlacesService {
     'https://overpass.openstreetmap.fr/api/interpreter',
   ];
 
-  // Caché en memoria (10 min)
   static final Map<String, _CacheEntry> _cache = {};
   static const LatLng kPastoCenter = LatLng(1.2136, -77.2811);
 
-  /// Obtiene veterinarias en Pasto, Nariño.
   Future<List<VetPlace>> fetchPasto() async {
-    const cacheKey = 'pasto_vets_v1';
-    final cached = _cache[cacheKey];
+    const key = 'pasto_vets_v1';
+    final cached = _cache[key];
 
     if (cached != null && !cached.isExpired) {
       return cached.data;
     }
 
-    // BBOX aproximado de Pasto
     const south = 1.1700;
     const west = -77.3300;
     const north = 1.2700;
@@ -47,65 +44,61 @@ class VetPlacesService {
     ''';
 
     final data = await _callOverpass(query);
-    if (data == null) {
-      // Si falla, devolvemos caché expirado si existe
-      return cached?.data ?? [];
-    }
+    if (data == null) return cached?.data ?? [];
 
     final elements = (data['elements'] as List?) ?? [];
     final vets = elements.map<VetPlace>(_parseElement).toList();
 
-    // Ordenar por cercanía al centro de Pasto
     _sortByDistance(vets);
+    _cache[key] = _CacheEntry(data: vets);
 
-    _cache[cacheKey] = _CacheEntry(data: vets);
     return vets;
   }
 
-  VetPlace _parseElement(dynamic element) {
-    final tags = (element['tags'] as Map?) ?? {};
+  VetPlace _parseElement(dynamic e) {
+    final tags = (e['tags'] as Map?) ?? {};
     final name = (tags['name'] ?? 'Veterinaria').toString();
-    final openingHours = tags['opening_hours']?.toString();
+    final opening = tags['opening_hours']?.toString();
 
-    late double lat, lon;
+    double lat, lon;
 
-    if (element['type'] == 'node') {
-      lat = (element['lat'] as num).toDouble();
-      lon = (element['lon'] as num).toDouble();
+    if (e['type'] == 'node') {
+      lat = (e['lat'] as num).toDouble();
+      lon = (e['lon'] as num).toDouble();
     } else {
-      final center = element['center'] as Map<String, dynamic>;
+      final center = e['center'] as Map<String, dynamic>;
       lat = (center['lat'] as num).toDouble();
       lon = (center['lon'] as num).toDouble();
     }
 
     return VetPlace(
-      id: '${element['type']}-${element['id']}',
+      id: '${e['type']}-${e['id']}',
       name: name,
       lat: lat,
       lon: lon,
-      openingHours: openingHours,
+      openingHours: opening,
     );
   }
 
-  void _sortByDistance(List<VetPlace> vets) {
-    const distance = Distance();
-    vets.sort((a, b) {
-      final distA = distance(LatLng(a.lat, a.lon), kPastoCenter);
-      final distB = distance(LatLng(b.lat, b.lon), kPastoCenter);
-      return distA.compareTo(distB);
+  void _sortByDistance(List<VetPlace> list) {
+    const d = Distance();
+    list.sort((a, b) {
+      final da = d(LatLng(a.lat, a.lon), kPastoCenter);
+      final db = d(LatLng(b.lat, b.lon), kPastoCenter);
+      return da.compareTo(db);
     });
   }
 
   Future<Map<String, dynamic>?> _callOverpass(String query) async {
-    final random = Random();
-    final startIndex = random.nextInt(_endpoints.length);
+    final r = Random();
+    final start = r.nextInt(_endpoints.length);
 
     for (int i = 0; i < _endpoints.length; i++) {
-      final url = _endpoints[(startIndex + i) % _endpoints.length];
+      final url = _endpoints[(start + i) % _endpoints.length];
 
       for (int attempt = 0; attempt < 3; attempt++) {
         try {
-          final response = await _client
+          final res = await _client
               .post(
                 Uri.parse(url),
                 headers: {
@@ -118,19 +111,18 @@ class VetPlacesService {
               )
               .timeout(const Duration(seconds: 25));
 
-          if (response.statusCode == 200) {
-            return json.decode(utf8.decode(response.bodyBytes))
+          if (res.statusCode == 200) {
+            return json.decode(utf8.decode(res.bodyBytes))
                 as Map<String, dynamic>;
           }
 
-          // Rate limit o error del servidor
-          if (response.statusCode == 429 || response.statusCode >= 500) {
+          if (res.statusCode == 429 || res.statusCode >= 500) {
             await _backoff(attempt);
             continue;
           }
 
-          break; // Otro error, probar siguiente endpoint
-        } catch (e) {
+          break;
+        } catch (_) {
           await Future.delayed(const Duration(milliseconds: 300));
         }
       }
@@ -139,9 +131,9 @@ class VetPlacesService {
   }
 
   Future<void> _backoff(int attempt) async {
-    final baseMs = (1 << attempt) * 400; // 400, 800, 1600
-    final jitterMs = Random().nextInt(250);
-    await Future.delayed(Duration(milliseconds: baseMs + jitterMs));
+    final base = (1 << attempt) * 400;
+    final jitter = Random().nextInt(250);
+    await Future.delayed(Duration(milliseconds: base + jitter));
   }
 
   void dispose() {

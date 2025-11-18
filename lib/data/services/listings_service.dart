@@ -4,7 +4,7 @@ import '../../core/config/supabase_config.dart';
 import '../models/listing.dart';
 
 class ListingsService {
-  static const _candidatesBuckets = ['media'];
+  static const _buckets = ['media'];
   final SupabaseClient _client = SupabaseConfig.client;
 
   Future<List<Listing>> getAll() async {
@@ -25,15 +25,15 @@ class ListingsService {
     String? imageUrl,
   }) async {
     final user = _client.auth.currentUser;
-    if (user == null) throw Exception('No hay usuario');
+    if (user == null) throw Exception('No user');
 
     await _client.from('listings').insert({
       'title': title,
       'description': description,
       'price': price,
-      'status': 'Sale', // <-- ÚNICO VALOR PERMITIDO PARA "Venta"
+      'status': 'Sale',
       'image_url': imageUrl,
-      'author': user.id, // <-- RLS requiere esto
+      'author': user.id,
     });
   }
 
@@ -47,7 +47,7 @@ class ListingsService {
   }) async {
     final path = 'marketplace/$filename';
 
-    for (final bucket in _candidatesBuckets) {
+    for (final bucket in _buckets) {
       try {
         await _client.storage
             .from(bucket)
@@ -59,7 +59,6 @@ class ListingsService {
                 contentType: 'image/*',
               ),
             );
-
         return _client.storage.from(bucket).getPublicUrl(path);
       } catch (_) {}
     }

@@ -6,17 +6,18 @@ import '../models/weight_model.dart';
 import '../models/health_event_model.dart';
 
 abstract class HealthRepository {
-  // PESOS
   Future<List<Weight>> getWeights(String petId);
+
   Future<void> addWeight({
     required String petId,
     required double valueKg,
     String? note,
   });
+
   Future<void> deleteWeight(String id);
 
-  // EVENTOS DE SALUD
   Future<List<HealthEvent>> getEvents(String petId);
+
   Future<void> addEvent({
     required String petId,
     required HealthType type,
@@ -24,6 +25,7 @@ abstract class HealthRepository {
     DateTime? happenedAt,
     String? details,
   });
+
   Future<void> deleteEvent(String id);
 }
 
@@ -33,7 +35,6 @@ class HealthRepositoryImpl implements HealthRepository {
 
   HealthRepositoryImpl(this.sb, this.getUid);
 
-  // ---------- PESOS ----------
   @override
   Future<List<Weight>> getWeights(String petId) async {
     final data = await sb
@@ -54,6 +55,7 @@ class HealthRepositoryImpl implements HealthRepository {
     String? note,
   }) async {
     final uid = getUid();
+
     await sb.from('weights').insert({
       'user_id': uid,
       'pet_id': petId,
@@ -67,7 +69,6 @@ class HealthRepositoryImpl implements HealthRepository {
     await sb.from('weights').delete().eq('id', id);
   }
 
-  // ---------- EVENTOS DE SALUD ----------
   @override
   Future<List<HealthEvent>> getEvents(String petId) async {
     final data = await sb
@@ -94,15 +95,9 @@ class HealthRepositoryImpl implements HealthRepository {
     await sb.from('health_events').insert({
       'user_id': uid,
       'pet_id': petId,
-
-      // ⛔ ESTA ES LA COLUMNA REAL EN LA BD
-      // Guarda solo: "vaccine" | "deworm" | "med"
       'type': healthTypeToString(type),
-
       'title': title,
-
       'happened_at': (happenedAt ?? DateTime.now()).toIso8601String(),
-
       if (details != null && details.trim().isNotEmpty) 'details': details,
     });
   }

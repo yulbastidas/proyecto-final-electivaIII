@@ -10,6 +10,7 @@ class StorageService {
   Future<String?> uploadImage(File file) async {
     final id = const Uuid().v4();
     final path = 'images/$id.jpg';
+
     await _client.storage
         .from(_bucket)
         .upload(
@@ -17,7 +18,7 @@ class StorageService {
           file,
           fileOptions: const FileOptions(contentType: 'image/jpeg'),
         );
-    final url = _client.storage.from(_bucket).getPublicUrl(path);
-    return url;
+
+    return _client.storage.from(_bucket).getPublicUrl(path);
   }
 }
