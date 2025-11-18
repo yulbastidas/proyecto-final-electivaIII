@@ -21,8 +21,7 @@ class PostModel extends Post {
       id: (m['id'] as num).toInt(),
       status: (m['status'] ?? '').toString(),
       mediaUrl: m['media_url'] as String?,
-      content:
-          m['content'] as String?, // puede venir null si no existe en tabla
+      content: m['content'] as String?,
       likes: likes,
       countryCode: m['country_code'] as String?,
       createdAt: DateTime.parse(m['created_at'] as String),
@@ -32,7 +31,7 @@ class PostModel extends Post {
   Map<String, dynamic> toInsert() => {
     'status': status,
     if (mediaUrl != null) 'media_url': mediaUrl,
-    // Solo enviamos content si existe en tu tabla
+
     if (content != null) 'content': content,
     if (countryCode != null) 'country_code': countryCode,
   };

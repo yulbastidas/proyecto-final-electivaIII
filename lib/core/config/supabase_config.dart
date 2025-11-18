@@ -9,16 +9,12 @@ class SupabaseConfig {
 
   static bool _initialized = false;
 
-  /// Llama esto una sola vez al arrancar la app
   static Future<void> init() async {
     if (_initialized) return;
 
-    // Carga .env (si ya estaba cargado, no truena)
     try {
       await dotenv.load(fileName: '.env');
-    } catch (_) {
-      // Ignorar: en web o producción puede venir precargado
-    }
+    } catch (_) {}
 
     final url = dotenv.env['SUPABASE_URL'];
     final anonKey = dotenv.env['SUPABASE_ANON_KEY'];
@@ -27,11 +23,7 @@ class SupabaseConfig {
       throw Exception('Faltan SUPABASE_URL o SUPABASE_ANON_KEY en .env');
     }
 
-    await Supabase.initialize(
-      url: url,
-      anonKey: anonKey,
-      // opcional: puedes ajustar schema/Auth si lo necesitas
-    );
+    await Supabase.initialize(url: url, anonKey: anonKey);
 
     _initialized = true;
     _dbg('Supabase inicializado');
@@ -40,7 +32,7 @@ class SupabaseConfig {
   /// Cliente global
   static SupabaseClient get client => Supabase.instance.client;
 
-  /// Nombres de buckets/tablas que usas
+  /// Nombres de buckets/tablas
   static const String bucketPublic = 'pets';
   static const String tableProfiles = 'profiles';
   static const String tablePosts = 'posts';

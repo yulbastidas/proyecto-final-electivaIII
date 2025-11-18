@@ -44,7 +44,7 @@ class Listing {
     'title': title,
     'description': description,
     'price': price,
-    'status': 'Sale', // <-- Siempre Venta
+    'status': 'Sale',
     'image_url': imageUrl,
     'author': userId,
   };

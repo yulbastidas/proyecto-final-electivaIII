@@ -19,7 +19,6 @@ class HealthEventModel {
     this.details,
   });
 
-  // Columnas reales en la base de datos
   static const selectColumns =
       'id, pet_id, user_id, type, title, happened_at, details';
 
