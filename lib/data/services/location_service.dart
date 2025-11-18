@@ -1,16 +1,27 @@
 import 'package:geolocator/geolocator.dart';
 
 class LocationService {
-  Future<Position?> current() async {
-    LocationPermission p = await Geolocator.checkPermission();
-    if (p == LocationPermission.denied ||
-        p == LocationPermission.deniedForever) {
-      p = await Geolocator.requestPermission();
+  /// Obtiene la ubicación actual del usuario.
+  /// Retorna null si los permisos son denegados.
+  Future<Position?> getCurrentPosition() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return null;
+      }
+
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+    } catch (e) {
+      return null;
     }
-    if (p == LocationPermission.denied ||
-        p == LocationPermission.deniedForever) {
-      return null; // sin permiso → devolvemos null (la UI usa un fallback)
-    }
-    return Geolocator.getCurrentPosition();
   }
 }

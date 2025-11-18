@@ -4,9 +4,11 @@ import 'package:latlong2/latlong.dart';
 
 class RoutingService {
   final http.Client _client;
+
   RoutingService([http.Client? client]) : _client = client ?? http.Client();
 
-  /// profile: 'driving' (rápida) | 'walking' (segura)
+  /// Calcula una ruta entre dos puntos usando OSRM.
+  /// [profile]: 'driving' (rápida) o 'walking' (segura)
   Future<({List<LatLng> path, double distanceM, double durationS})> route({
     required String profile,
     required LatLng from,
@@ -19,29 +21,43 @@ class RoutingService {
     );
 
     try {
-      final res = await _client.get(url);
-      if (res.statusCode != 200) {
+      final response = await _client
+          .get(url)
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != 200) {
         return (path: <LatLng>[], distanceM: 0.0, durationS: 0.0);
       }
-      final data = json.decode(res.body) as Map<String, dynamic>;
-      final routes = (data['routes'] as List);
+
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      final routes = (data['routes'] as List?) ?? [];
+
       if (routes.isEmpty) {
         return (path: <LatLng>[], distanceM: 0.0, durationS: 0.0);
       }
-      final r = routes.first;
-      final coords = (r['geometry']['coordinates'] as List)
+
+      final route = routes.first;
+      final geometry = route['geometry'] as Map<String, dynamic>;
+      final coordinates = (geometry['coordinates'] as List)
           .map<LatLng>(
-            (c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()),
+            (coord) => LatLng(
+              (coord[1] as num).toDouble(),
+              (coord[0] as num).toDouble(),
+            ),
           )
           .toList();
 
       return (
-        path: coords,
-        distanceM: (r['distance'] as num).toDouble(),
-        durationS: (r['duration'] as num).toDouble(),
+        path: coordinates,
+        distanceM: (route['distance'] as num).toDouble(),
+        durationS: (route['duration'] as num).toDouble(),
       );
-    } catch (_) {
+    } catch (e) {
       return (path: <LatLng>[], distanceM: 0.0, durationS: 0.0);
     }
+  }
+
+  void dispose() {
+    _client.close();
   }
 }

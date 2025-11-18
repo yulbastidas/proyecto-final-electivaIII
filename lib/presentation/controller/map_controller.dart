@@ -7,88 +7,111 @@ import '../../data/services/routing_service.dart';
 import '../../data/models/vet_place.dart';
 
 class MapController extends ChangeNotifier {
-  MapController({VetPlacesService? vetsService, RoutingService? routing})
-    : _vetsSvc = vetsService ?? VetPlacesService(),
-      _routing = routing ?? RoutingService();
+  MapController({
+    VetPlacesService? vetsService,
+    RoutingService? routing,
+    LocationService? locationService,
+  }) : _vetsSvc = vetsService ?? VetPlacesService(),
+       _routing = routing ?? RoutingService(),
+       _locationSvc = locationService ?? LocationService();
 
   static const LatLng kPastoCenter = LatLng(1.2136, -77.2811);
 
-  final _loc = LocationService();
+  final LocationService _locationSvc;
   final VetPlacesService _vetsSvc;
   final RoutingService _routing;
 
   LatLng cityCenter = kPastoCenter;
-  LatLng? me;
+  LatLng? userLocation;
+  bool isLoading = false;
 
-  bool loading = false;
+  List<VetPlace> veterinaries = [];
+  VetPlace? selectedVet;
+  List<LatLng> routePath = [];
+  double? distanceKm;
+  int? durationMin;
+  String routeMode = 'driving';
 
-  List<VetPlace> vets = [];
-  VetPlace? selected;
-  List<LatLng> route = [];
-  double? lastDistanceKm;
-  int? lastDurationMin;
-
-  String routeMode = 'driving'; // 'driving' | 'walking'
-
-  List<VetPlace> get filteredVets => vets;
-
-  Future<void> refresh() async {
-    loading = true;
+  /// Carga veterinarias y ubicación del usuario.
+  Future<void> initialize() async {
+    isLoading = true;
     notifyListeners();
+
     try {
-      cityCenter = kPastoCenter;
-      await fetchVets();
-      final p = await _loc.current();
-      me = (p != null) ? LatLng(p.latitude, p.longitude) : null;
+      await _loadVeterinaries();
+      await _loadUserLocation();
     } finally {
-      loading = false;
+      isLoading = false;
       notifyListeners();
     }
   }
 
-  // 🔹 Ahora siempre carga veterinarias de Pasto (OSM)
-  Future<void> fetchVets() async {
-    vets = await _vetsSvc.fetchPasto();
-    notifyListeners();
+  Future<void> _loadVeterinaries() async {
+    veterinaries = await _vetsSvc.fetchPasto();
   }
 
-  Future<void> buildRouteTo(VetPlace v) async {
-    final from = me ?? cityCenter;
-    loading = true;
+  Future<void> _loadUserLocation() async {
+    final position = await _locationSvc.getCurrentPosition();
+    userLocation = position != null
+        ? LatLng(position.latitude, position.longitude)
+        : null;
+  }
+
+  /// Calcula y dibuja la ruta hacia una veterinaria.
+  Future<void> navigateToVet(VetPlace vet) async {
+    final origin = userLocation ?? cityCenter;
+
+    isLoading = true;
     notifyListeners();
+
     try {
-      final res = await _routing.route(
+      final result = await _routing.route(
         profile: routeMode,
-        from: from,
-        to: LatLng(v.lat, v.lon),
+        from: origin,
+        to: LatLng(vet.lat, vet.lon),
       );
-      route = res.path;
-      selected = v;
-      if (res.distanceM > 0) {
-        lastDistanceKm = (res.distanceM / 1000);
-        lastDurationMin = (res.durationS / 60).round();
+
+      routePath = result.path;
+      selectedVet = vet;
+
+      if (result.distanceM > 0) {
+        distanceKm = result.distanceM / 1000;
+        durationMin = (result.durationS / 60).round();
       } else {
-        lastDistanceKm = null;
-        lastDurationMin = null;
+        distanceKm = null;
+        durationMin = null;
       }
     } finally {
-      loading = false;
+      isLoading = false;
       notifyListeners();
     }
   }
 
+  /// Limpia la ruta actual.
   void clearRoute() {
-    route = [];
-    lastDistanceKm = null;
-    lastDurationMin = null;
+    routePath = [];
+    selectedVet = null;
+    distanceKm = null;
+    durationMin = null;
     notifyListeners();
   }
 
-  Future<void> setRouteMode(String m) async {
-    routeMode = m;
+  /// Cambia el modo de transporte y recalcula la ruta.
+  Future<void> changeRouteMode(String mode) async {
+    if (mode == routeMode) return;
+
+    routeMode = mode;
     notifyListeners();
-    if (selected != null) {
-      await buildRouteTo(selected!);
+
+    if (selectedVet != null) {
+      await navigateToVet(selectedVet!);
     }
+  }
+
+  @override
+  void dispose() {
+    _vetsSvc.dispose();
+    _routing.dispose();
+    super.dispose();
   }
 }
