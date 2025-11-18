@@ -1,9 +1,9 @@
 class Post {
   final int id;
   final String status;
-  final String? mediaUrl; // antes imageUrl
-  final String? content; // opcional (tu tabla puede no tenerla)
-  final int likes; // opcional (0 si no existe en DB)
+  final String? mediaUrl;
+  final String? content;
+  final int likes;
   final String? countryCode;
   final DateTime createdAt;
 

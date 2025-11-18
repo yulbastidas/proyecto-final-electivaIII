@@ -13,6 +13,7 @@ abstract class FeedRepository {
   });
 
   Future<Post> toggleLike(int postId);
+
   Future<void> deletePost(int postId);
 
   Future<CommentEntity> addComment({

@@ -3,7 +3,7 @@ class MessageEntity {
   final String sessionId;
   final String petId;
   final String userId;
-  final String role; // 'user' o 'assistant'
+  final String role;
   final String message;
   final DateTime createdAt;
 

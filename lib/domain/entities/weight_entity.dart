@@ -2,9 +2,9 @@ class Weight {
   final String id;
   final String petId;
   final String userId;
-  final double valueKg; // ✅ usa valueKg
+  final double valueKg;
   final DateTime notedAt;
-  final String? notes; // ✅ notes
+  final String? notes;
 
   const Weight({
     required this.id,

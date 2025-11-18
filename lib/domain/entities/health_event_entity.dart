@@ -1,11 +1,5 @@
-/// Tipos de evento de salud admitidos (SOLO estos 3)
-enum HealthType {
-  vaccine, // vacuna
-  deworm, // desparasitación
-  med, // medicación
-}
+enum HealthType { vaccine, deworm, med }
 
-/// Entidad de EVENTO DE SALUD (dominio)
 class HealthEvent {
   final String id;
   final String userId;
@@ -24,26 +18,21 @@ class HealthEvent {
   });
 }
 
-/// Helper: string → HealthType
 HealthType healthTypeFromString(String? raw) {
   final v = (raw ?? '').trim().toLowerCase();
 
-  // Coincidencia directa: vaccine, deworm, med
   for (final t in HealthType.values) {
     if (t.name == v) return t;
   }
 
-  // Aliases español e inglés
   switch (v) {
     case 'vacuna':
     case 'vaccine':
       return HealthType.vaccine;
-
     case 'desparasitación':
     case 'desparasitacion':
     case 'deworm':
       return HealthType.deworm;
-
     case 'medicación':
     case 'medicacion':
     case 'medication':
@@ -52,11 +41,9 @@ HealthType healthTypeFromString(String? raw) {
       return HealthType.med;
   }
 
-  // Si llega algo inesperado → por seguridad devolvemos med
   return HealthType.med;
 }
 
-/// Helper inverso: HealthType → string válido para Supabase
 String healthTypeToString(HealthType t) {
   switch (t) {
     case HealthType.vaccine:
