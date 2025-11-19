@@ -24,6 +24,7 @@ class _ChatPageState extends State<ChatPage> {
   @override
   Widget build(BuildContext context) {
     final ctrl = widget.controller;
+    final isMobile = MediaQuery.of(context).size.width < 700;
 
     return Scaffold(
       appBar: AppBar(
@@ -36,6 +37,11 @@ class _ChatPageState extends State<ChatPage> {
           ),
         ],
       ),
+
+      // ---------------------- DRAWER PARA CELULAR ----------------------
+      drawer: isMobile ? Drawer(child: _buildSidebar(ctrl)) : null,
+
+      // ---------------------- CONTENIDO ----------------------
       body: AnimatedBuilder(
         animation: ctrl,
         builder: (_, __) {
@@ -49,7 +55,7 @@ class _ChatPageState extends State<ChatPage> {
 
           return Row(
             children: [
-              _buildSidebar(ctrl),
+              if (!isMobile) SizedBox(width: 260, child: _buildSidebar(ctrl)),
               Expanded(
                 child: Column(
                   children: [
@@ -74,10 +80,9 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  // ---------------- Sidebar ----------------
+  // ---------------- Sidebar (Lista de sesiones) ----------------
   Widget _buildSidebar(ChatController ctrl) {
     return Container(
-      width: 250,
       color: Colors.grey.shade200,
       child: Column(
         children: [
@@ -85,7 +90,7 @@ class _ChatPageState extends State<ChatPage> {
             padding: EdgeInsets.all(12),
             child: Text(
               "Sesiones",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
             ),
           ),
           Expanded(
@@ -100,7 +105,12 @@ class _ChatPageState extends State<ChatPage> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   selected: selected,
-                  onTap: () => ctrl.loadSession(s.id),
+                  selectedColor: Colors.white,
+                  selectedTileColor: Colors.blue.shade100,
+                  onTap: () {
+                    ctrl.loadSession(s.id);
+                    Navigator.pop(context); // cerrar drawer en móviles
+                  },
                   trailing: IconButton(
                     icon: const Icon(Icons.delete_outline),
                     onPressed: () => ctrl.deleteSession(s.id),
