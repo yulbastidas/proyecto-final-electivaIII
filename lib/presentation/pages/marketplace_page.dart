@@ -173,48 +173,75 @@ class _ComposerState extends State<_Composer> {
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: AppTextField(controller: _titleCtrl, label: 'Título'),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: AppTextField(
-                    controller: _priceCtrl,
-                    label: 'Precio',
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-              ],
+            /// ---------- Fila Título + Precio (responsiva) ----------
+            LayoutBuilder(
+              builder: (context, constraints) {
+                bool isSmall = constraints.maxWidth < 380;
+
+                if (isSmall) {
+                  return Column(
+                    children: [
+                      AppTextField(controller: _titleCtrl, label: 'Título'),
+                      const SizedBox(height: 8),
+                      AppTextField(
+                        controller: _priceCtrl,
+                        label: 'Precio',
+                        keyboardType: TextInputType.number,
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(
+                      child: AppTextField(
+                        controller: _titleCtrl,
+                        label: 'Título',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: AppTextField(
+                        controller: _priceCtrl,
+                        label: 'Precio',
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
+
+            /// ---------- Descripción ----------
             AppTextField(
               controller: _descCtrl,
               label: 'Descripción',
               maxLines: 3,
             ),
 
-            const SizedBox(height: 8),
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Venta',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              ),
+            const SizedBox(height: 12),
+            const Text(
+              'Venta',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
 
-            const SizedBox(height: 8),
-            Row(
+            const SizedBox(height: 12),
+
+            /// ---------- Botones (responsivos con Wrap) ----------
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 OutlinedButton.icon(
                   onPressed: _pick,
                   icon: const Icon(Icons.photo),
                   label: Text(_filename ?? 'Imagen (opcional)'),
                 ),
-                const Spacer(),
                 PrimaryButton(
                   text: 'Publicar',
                   loading: _submitting,
@@ -224,10 +251,15 @@ class _ComposerState extends State<_Composer> {
             ),
 
             if (_bytes != null) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.memory(_bytes!, height: 140, fit: BoxFit.cover),
+                child: Image.memory(
+                  _bytes!,
+                  height: 140,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
               ),
             ],
           ],
